@@ -40,8 +40,17 @@ if (!$turnier) {
 $titel = $turnier ? $turnier['titel'] : '2. Binokelturnier Heroldstatt';
 $datum = $turnier ? $turnier['datum'] : '09.05.2026';
 $ort = $turnier ? $turnier['ort'] : 'Berghalle';
-$startzeit = $turnier ? ($turnier['startzeit'] ?? '18 Uhr') : '18 Uhr';
-$einlasszeit = $turnier ? ($turnier['einlasszeit'] ?? '17 Uhr') : '17 Uhr';
+$startzeitRaw = $turnier ? ($turnier['startzeit'] ?? '18') : '18';
+$einlasszeitRaw = $turnier ? ($turnier['einlasszeit'] ?? '17') : '17';
+
+// "Uhr" hinzufügen, falls nicht bereits vorhanden
+$startzeit = (strpos($startzeitRaw, 'Uhr') !== false || strpos($startzeitRaw, 'uhr') !== false) 
+    ? $startzeitRaw 
+    : trim($startzeitRaw) . ' Uhr';
+$einlasszeit = (strpos($einlasszeitRaw, 'Uhr') !== false || strpos($einlasszeitRaw, 'uhr') !== false) 
+    ? $einlasszeitRaw 
+    : trim($einlasszeitRaw) . ' Uhr';
+
 $subtitle = $turnier ? 
     ($datum . ' in ' . $ort . ', Beginn ' . $startzeit . ' (Einlass ' . $einlasszeit . ')') :
     ('09.05.2026 in der Berghalle, Beginn 18 Uhr (Einlass 17 Uhr)');
@@ -214,9 +223,33 @@ if ($turnier && !empty($turnier['datum'])) {
                     </label>
                 </div>
 
-                <button type="submit" class="btn">Anmelden</button>
+                <button type="submit" class="btn" id="submitBtn">Anmelden</button>
             </form>
         <?php endif; ?>
     </div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            if (form && submitBtn && loadingOverlay) {
+                form.addEventListener('submit', function(e) {
+                    // Zeige sofort den Wartekreisel
+                    loadingOverlay.classList.add('active');
+                    
+                    // Deaktiviere den Button, um mehrfaches Klicken zu verhindern
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Wird verarbeitet...';
+                });
+            }
+        });
+    </script>
 </body>
 </html>

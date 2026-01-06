@@ -524,25 +524,29 @@ if ($aktuellesTurnier) {
             /* Overlay immer anzeigen beim Drucken */
             #laufzettelOverlay {
                 display: flex !important;
-                position: fixed !important;
+                position: relative !important;
                 top: 0 !important;
                 left: 0 !important;
                 width: 100% !important;
-                height: 100% !important;
+                height: auto !important;
                 background: white !important;
                 z-index: 99999 !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                overflow: visible !important;
             }
             .laufzettel-container {
                 width: 64mm !important;
                 max-width: 64mm !important;
                 height: auto !important;
+                min-height: auto !important;
                 box-shadow: none !important;
                 padding: 0 !important;
-                margin: 0 !important;
+                margin: 0 auto !important;
                 background: white !important;
                 display: block !important;
+                overflow: visible !important;
+                page-break-inside: avoid !important;
             }
             .laufzettel-content {
                 max-width: 64mm !important;
@@ -551,12 +555,16 @@ if ($aktuellesTurnier) {
                 padding: 0 !important;
                 background: white !important;
                 border: none !important;
+                overflow: visible !important;
+                height: auto !important;
             }
             .laufzettel-html {
                 max-width: 100% !important;
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                overflow: visible !important;
+                height: auto !important;
             }
             .laufzettel-logo .logo-img {
                 max-height: 25mm !important;
@@ -568,14 +576,37 @@ if ($aktuellesTurnier) {
                 font-size: 8pt !important;
             }
             .info-value-small {
-                font-size: 7pt !important;
+                font-size: 10pt !important;
                 font-weight: normal !important;
+            }
+            /* Spezifischere Regeln für Name und Email im Spieler-Bereich */
+            .laufzettel-spieler .info-row {
+                font-size: 8pt !important;
+            }
+            .laufzettel-spieler .info-row .info-value-small,
+            .laufzettel-spieler .info-value-small,
+            .laufzettel-spieler span.info-value-small {
+                font-size: 12pt !important;
+                font-weight: normal !important;
+            }
+            .laufzettel-spieler .info-label-small {
+                font-size: 9pt !important;
+            }
+            .laufzettel-runde {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: visible !important;
             }
             .runde-label {
                 font-size: 8pt !important;
             }
             .runde-field {
                 min-height: 16px !important;
+            }
+            .laufzettel-summe {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: visible !important;
             }
             .summe-label {
                 font-size: 10pt !important;

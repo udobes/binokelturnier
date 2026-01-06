@@ -1,0 +1,15 @@
+# SFTP-Befehle zum Hochladen der geänderten Dateien
+# Verwendung: sftp -b upload_files.sftp benutzer@server
+
+# Wechsle ins Projektverzeichnis (bitte anpassen falls nötig)
+cd /pfad/zum/projekt/binokel
+
+# Hochladen der geänderten Dateien
+put info/index.php info/index.php
+put anmeldung/index.php anmeldung/index.php
+put anmeldung/style.css anmeldung/style.css
+put turnier/registrierung.php turnier/registrierung.php
+
+# Beenden
+quit
+
