@@ -458,20 +458,13 @@ function sendConfirmationEmail($name, $email, $anmeldungId = null, $turnier = nu
     $textMessage = str_replace('{STARTZEIT}', $startzeit, $textMessage);
     $textMessage = str_replace('{EINLASSZEIT}', $einlasszeit, $textMessage);
     
-    // Tracking-Pixel hinzufügen, falls Anmeldung-ID vorhanden
+    // Tracking-Pixel vorbereiten, falls Anmeldung-ID vorhanden
     $trackingPixel = '';
+    $trackingCode = null;
     if ($anmeldungId !== null) {
         $db = getDB();
-        // Tracking-Code generieren und speichern
+        // Tracking-Code generieren (wird erst gespeichert, wenn E-Mail erfolgreich versendet wurde)
         $trackingCode = generateTrackingCode($anmeldungId);
-        $emailGesendet = date('Y-m-d H:i:s');
-        
-        try {
-            $stmt = $db->prepare("UPDATE anmeldungen SET tracking_code = ?, email_gesendet = ? WHERE id = ?");
-            $stmt->execute([$trackingCode, $emailGesendet, $anmeldungId]);
-        } catch (PDOException $e) {
-            // Fehler ignorieren, Tracking ist optional
-        }
         
         // Tracking-Pixel URL erstellen
         $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
@@ -527,6 +520,21 @@ function sendConfirmationEmail($name, $email, $anmeldungId = null, $turnier = nu
     
     // E-Mail versenden (mit HTML und Text-Version und Anhang)
     $result = sendEmail($email, $subject, $htmlMessage, $textMessage, null, $attachment);
+    
+    // Tracking-Code und email_gesendet NUR speichern, wenn E-Mail erfolgreich versendet wurde
+    if ($result && $anmeldungId !== null && $trackingCode !== null) {
+        $db = getDB();
+        $emailGesendet = date('Y-m-d H:i:s');
+        
+        try {
+            $stmt = $db->prepare("UPDATE anmeldungen SET tracking_code = ?, email_gesendet = ? WHERE id = ?");
+            $stmt->execute([$trackingCode, $emailGesendet, $anmeldungId]);
+        } catch (PDOException $e) {
+            // Fehler ignorieren, Tracking ist optional
+            error_log("Fehler beim Speichern von tracking_code und email_gesendet: " . $e->getMessage());
+        }
+    }
+    
     return $result;
 }
 

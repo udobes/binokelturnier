@@ -84,18 +84,29 @@ function initTurnierDB() {
         FOREIGN KEY (turnier_id) REFERENCES turnier(id)
     )");
     
-    // Tabelle für Turnier-Registrierungen erstellen
+    // Tabelle für Turnier-Registrierungen erstellen (OHNE name, email, mobilnummer - kommen aus anmeldungen)
     $db->exec("CREATE TABLE IF NOT EXISTS turnier_registrierungen (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         turnier_id INTEGER NOT NULL,
         anmeldung_id INTEGER,
-        name TEXT NOT NULL,
-        email TEXT,
-        mobilnummer TEXT,
         startnummer INTEGER NOT NULL,
         registriert_am TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (turnier_id) REFERENCES turnier(id)
     )");
+    
+    // Foreign Keys aktivieren (SQLite)
+    try {
+        $db->exec("PRAGMA foreign_keys = ON");
+    } catch (PDOException $e) {
+        // Kann bei einigen SQLite-Versionen fehlschlagen, ignorieren
+    }
+    
+    // Index für anmeldung_id hinzufügen
+    try {
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_turnier_registrierungen_anmeldung ON turnier_registrierungen(anmeldung_id)");
+    } catch (PDOException $e) {
+        // Index existiert bereits, ignorieren
+    }
     
     // Index für bessere Performance
     try {
@@ -115,29 +126,31 @@ function initTurnierDB() {
         // Spalte existiert bereits, ignorieren
     }
     
-    // Migration: Überflüssige Ergebnis-Spalten entfernen (rundeX_punkte und rundeX_eingetragen_am)
+    // Migration: Überflüssige Spalten entfernen (rundeX_punkte, rundeX_eingetragen_am, name, email, mobilnummer)
     // SQLite unterstützt DROP COLUMN erst ab Version 3.35.0, daher Migration durchführen
     try {
-        // Prüfen, ob noch alte Spalten existieren
+        // Prüfen, welche Spalten noch existieren
         $stmt = $db->query("PRAGMA table_info(turnier_registrierungen)");
         $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $hasOldColumns = false;
+        $hasOldRundenColumns = false;
+        $hasOldDataColumns = false;
+        $columnNames = [];
         foreach ($columns as $col) {
+            $columnNames[] = $col['name'];
             if (preg_match('/^runde\d+_(punkte|eingetragen_am)$/', $col['name'])) {
-                $hasOldColumns = true;
-                break;
+                $hasOldRundenColumns = true;
+            }
+            if (in_array($col['name'], ['name', 'email', 'mobilnummer'])) {
+                $hasOldDataColumns = true;
             }
         }
         
-        if ($hasOldColumns) {
+        if ($hasOldRundenColumns || $hasOldDataColumns) {
             // Neue Tabelle ohne die überflüssigen Spalten erstellen
             $db->exec("CREATE TABLE turnier_registrierungen_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 turnier_id INTEGER NOT NULL,
                 anmeldung_id INTEGER,
-                name TEXT NOT NULL,
-                email TEXT,
-                mobilnummer TEXT,
                 startnummer INTEGER NOT NULL,
                 registriert_am TEXT DEFAULT CURRENT_TIMESTAMP,
                 gesamtpunkte INTEGER DEFAULT NULL,
@@ -145,11 +158,27 @@ function initTurnierDB() {
                 FOREIGN KEY (turnier_id) REFERENCES turnier(id)
             )");
             
-            // Daten kopieren (ohne die zu löschenden Spalten)
-            $db->exec("INSERT INTO turnier_registrierungen_new 
-                (id, turnier_id, anmeldung_id, name, email, mobilnummer, startnummer, registriert_am, gesamtpunkte)
-                SELECT id, turnier_id, anmeldung_id, name, email, mobilnummer, startnummer, registriert_am, gesamtpunkte
-                FROM turnier_registrierungen");
+            // Daten kopieren (nur die Spalten, die in der neuen Tabelle existieren)
+            // Prüfen welche Spalten in der alten Tabelle existieren
+            $selectColumns = [];
+            $newColumns = ['id', 'turnier_id', 'anmeldung_id', 'startnummer', 'registriert_am'];
+            
+            // Gesamtpunkte nur kopieren, wenn es existiert
+            if (in_array('gesamtpunkte', $columnNames)) {
+                $newColumns[] = 'gesamtpunkte';
+            }
+            
+            foreach ($newColumns as $col) {
+                if (in_array($col, $columnNames)) {
+                    $selectColumns[] = $col;
+                }
+            }
+            
+            if (!empty($selectColumns)) {
+                $selectCols = implode(', ', $selectColumns);
+                $insertCols = implode(', ', $selectColumns);
+                $db->exec("INSERT INTO turnier_registrierungen_new ($insertCols) SELECT $selectCols FROM turnier_registrierungen");
+            }
             
             // Alte Tabelle löschen
             $db->exec("DROP TABLE turnier_registrierungen");
@@ -161,6 +190,7 @@ function initTurnierDB() {
             try {
                 $db->exec("CREATE INDEX IF NOT EXISTS idx_turnier_registrierungen_turnier ON turnier_registrierungen(turnier_id)");
                 $db->exec("CREATE INDEX IF NOT EXISTS idx_turnier_registrierungen_startnummer ON turnier_registrierungen(turnier_id, startnummer)");
+                $db->exec("CREATE INDEX IF NOT EXISTS idx_turnier_registrierungen_anmeldung ON turnier_registrierungen(anmeldung_id)");
             } catch (PDOException $e) {
                 // Index existiert bereits, ignorieren
             }
@@ -360,8 +390,12 @@ function getErgebnisseFuerSpieler($turnierId, $spieler) {
 function getErgebnisseFuerTurnier($turnierId, $anzahlRunden) {
     $db = getDB();
     
-    // Basis-Daten aus turnier_registrierungen
-    $stmt = $db->prepare("SELECT startnummer, name, gesamtpunkte FROM turnier_registrierungen WHERE turnier_id = ? ORDER BY startnummer");
+    // Basis-Daten aus turnier_registrierungen (mit JOIN zu anmeldungen für Name)
+    $stmt = $db->prepare("SELECT tr.startnummer, a.name, tr.gesamtpunkte 
+        FROM turnier_registrierungen tr 
+        LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id 
+        WHERE tr.turnier_id = ? 
+        ORDER BY tr.startnummer");
     $stmt->execute([$turnierId]);
     $registrierungen = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -464,9 +498,9 @@ function registriereDurchNummer($turnierId, $registrierNummer) {
     // Startnummer vergeben
     $startnummer = getNextStartnummer($turnierId);
     
-    // Registrierung speichern
-    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, name, email, startnummer) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$turnierId, $registrierNummer, $anmeldung['name'], $anmeldung['email'], $startnummer]);
+    // Registrierung speichern (nur anmeldung_id, Name und Email kommen aus anmeldungen)
+    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
+    $stmt->execute([$turnierId, $registrierNummer, $startnummer]);
     
     return ['success' => true, 'startnummer' => $startnummer, 'name' => $anmeldung['name']];
 }
@@ -492,9 +526,13 @@ function registriereDurchNummerMitDaten($turnierId, $registrierNummer, $name, $e
     // Startnummer vergeben
     $startnummer = getNextStartnummer($turnierId);
     
-    // Registrierung speichern
-    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, name, email, mobilnummer, startnummer) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$turnierId, $registrierNummer, $name, $email, $mobilnummer, $startnummer]);
+    // Daten in anmeldungen aktualisieren, falls sie geändert wurden
+    $stmt = $db->prepare("UPDATE anmeldungen SET name = ?, email = ?, mobilnummer = ? WHERE id = ?");
+    $stmt->execute([$name, $email, $mobilnummer, $registrierNummer]);
+    
+    // Registrierung speichern (nur anmeldung_id, Name, Email und Mobilnummer kommen aus anmeldungen)
+    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
+    $stmt->execute([$turnierId, $registrierNummer, $startnummer]);
     
     return ['success' => true, 'startnummer' => $startnummer, 'name' => $name];
 }
@@ -518,8 +556,8 @@ function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = 
     $emailFuerAnmeldung = !empty($email) ? $email : 'keine-email-' . time() . '@turnier.local';
     
     $anmeldedatum = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email) VALUES (?, ?, ?)");
-    $stmt->execute([$anmeldedatum, $name, $emailFuerAnmeldung]);
+    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$anmeldedatum, $name, $emailFuerAnmeldung, $mobilnummer]);
     $anmeldungId = $db->lastInsertId();
     
     // Falls lastInsertId() fehlschlägt, ID aus DB holen
@@ -535,17 +573,32 @@ function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = 
     // Startnummer vergeben
     $startnummer = getNextStartnummer($turnierId);
     
-    // Registrierung speichern (mit anmeldung_id)
-    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, name, email, mobilnummer, startnummer) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$turnierId, $anmeldungId, $name, $email, $mobilnummer, $startnummer]);
+    // Registrierung speichern (nur anmeldung_id, Name, Email und Mobilnummer kommen aus anmeldungen)
+    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
+    $stmt->execute([$turnierId, $anmeldungId, $startnummer]);
     
     return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'anmeldung_id' => $anmeldungId];
 }
 
-// Alle Registrierungen für ein Turnier holen
+// Alle Registrierungen für ein Turnier holen (mit JOIN zu anmeldungen für Name, Email, Mobilnummer)
 function getTurnierRegistrierungen($turnierId) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT * FROM turnier_registrierungen WHERE turnier_id = ? ORDER BY startnummer");
+    $stmt = $db->prepare("
+        SELECT 
+            tr.id,
+            tr.turnier_id,
+            tr.anmeldung_id,
+            tr.startnummer,
+            tr.registriert_am,
+            tr.gesamtpunkte,
+            a.name,
+            a.email,
+            a.mobilnummer
+        FROM turnier_registrierungen tr
+        LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
+        WHERE tr.turnier_id = ? 
+        ORDER BY tr.startnummer
+    ");
     $stmt->execute([$turnierId]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

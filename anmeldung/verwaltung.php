@@ -225,6 +225,15 @@ if ($selectedTurnierId) {
     $stmt = $db->prepare("SELECT * FROM anmeldungen WHERE turnier_id = ? ORDER BY anmeldedatum DESC");
     $stmt->execute([$selectedTurnierId]);
     $anmeldungen = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Für jede Anmeldung prüfen, ob sie bereits in turnier_registrierungen registriert ist
+    foreach ($anmeldungen as &$anmeldung) {
+        $stmt = $db->prepare("SELECT COUNT(*) as count FROM turnier_registrierungen WHERE anmeldung_id = ?");
+        $stmt->execute([$anmeldung['id']]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $anmeldung['is_registered'] = ($result['count'] > 0);
+    }
+    unset($anmeldung); // Referenz löschen
 } else {
     // Falls kein Turnier ausgewählt, keine Anmeldungen anzeigen
     $anmeldungen = [];
@@ -254,7 +263,7 @@ if ($selectedTurnierId) {
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             padding: 30px;
@@ -454,6 +463,29 @@ if ($selectedTurnierId) {
             background: #fff3cd;
             color: #856404;
         }
+        .name-column {
+            min-width: 180px;
+            width: 180px;
+        }
+        .email-column {
+            min-width: 200px;
+            width: 200px;
+        }
+        #teilnehmerliste-tabelle {
+            width: 100%;
+            table-layout: auto;
+        }
+        #teilnehmerliste-tabelle td.name-column {
+            min-width: 180px;
+            width: 180px;
+        }
+        #teilnehmerliste-tabelle td.email-column {
+            min-width: 200px;
+            width: 200px;
+        }
+        .print-area {
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -592,8 +624,8 @@ if ($selectedTurnierId) {
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Name</th>
-                    <th>E-Mail</th>
+                    <th class="name-column">Name</th>
+                    <th class="email-column">E-Mail</th>
                     <th>Mobilnummer</th>
                     <th>Anmeldedatum</th>
                     <th>E-Mail gesendet</th>
@@ -606,8 +638,8 @@ if ($selectedTurnierId) {
                 <?php foreach ($anmeldungen as $anmeldung): ?>
                     <tr id="row-<?php echo $anmeldung['id']; ?>">
                         <td><?php echo htmlspecialchars($anmeldung['id']); ?></td>
-                        <td class="name-<?php echo $anmeldung['id']; ?>"><?php echo htmlspecialchars($anmeldung['name']); ?></td>
-                        <td class="email-<?php echo $anmeldung['id']; ?>"><?php echo htmlspecialchars($anmeldung['email']); ?></td>
+                        <td class="name-column name-<?php echo $anmeldung['id']; ?>"><?php echo htmlspecialchars($anmeldung['name']); ?></td>
+                        <td class="email-column email-<?php echo $anmeldung['id']; ?>"><?php echo htmlspecialchars($anmeldung['email']); ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['mobilnummer'] ?? '-'); ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['anmeldedatum'] ?? '-'); ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['email_gesendet'] ?? '-'); ?></td>
@@ -629,16 +661,18 @@ if ($selectedTurnierId) {
                                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                 </svg>
                             </button>
-                            <button class="icon-btn icon-btn-delete" onclick="deleteRow(<?php echo $anmeldung['id']; ?>)" title="Löschen">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                                </svg>
-                            </button>
                             <button class="icon-btn icon-btn-resend" onclick="resendEmail(<?php echo $anmeldung['id']; ?>)" title="Mail erneut senden">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                     <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
                                 </svg>
                             </button>
+                            <?php if (!isset($anmeldung['is_registered']) || !$anmeldung['is_registered']): ?>
+                            <button class="icon-btn icon-btn-delete" onclick="deleteRow(<?php echo $anmeldung['id']; ?>)" title="Löschen">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                            </button>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <tr id="edit-<?php echo $anmeldung['id']; ?>" class="edit-form">

@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['startnummer']) && iss
     
     $db = getDB();
     
-    // Registrierung finden
-    $stmt = $db->prepare("SELECT * FROM turnier_registrierungen WHERE turnier_id = ? AND startnummer = ?");
+    // Registrierung finden (nur ID prüfen für Existenz)
+    $stmt = $db->prepare("SELECT id FROM turnier_registrierungen WHERE turnier_id = ? AND startnummer = ?");
     $stmt->execute([$aktuellesTurnier['id'], $startnummer]);
     $registrierung = $stmt->fetch(PDO::FETCH_ASSOC);
     

@@ -23,9 +23,21 @@ if (!$aktuellesTurnier) {
     die(json_encode(['success' => false, 'message' => 'Kein aktives Turnier gefunden.']));
 }
 
-// Registrierung aus Datenbank holen
+// Registrierung aus Datenbank holen (mit JOIN zu anmeldungen für Name, Email, Mobilnummer)
 $db = getDB();
-$stmt = $db->prepare("SELECT * FROM turnier_registrierungen WHERE turnier_id = ? AND startnummer = ?");
+$stmt = $db->prepare("
+    SELECT 
+        tr.id,
+        tr.turnier_id,
+        tr.anmeldung_id,
+        tr.startnummer,
+        a.name,
+        a.email,
+        a.mobilnummer
+    FROM turnier_registrierungen tr
+    LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
+    WHERE tr.turnier_id = ? AND tr.startnummer = ?
+");
 $stmt->execute([$aktuellesTurnier['id'], $startnummer]);
 $registrierung = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -36,9 +48,9 @@ if (!$registrierung) {
 // Laufzettel-Daten zusammenstellen
 $laufzettelDaten = [
     'startnummer' => $registrierung['startnummer'],
-    'name' => $registrierung['name'],
-    'email' => $registrierung['email'],
-    'mobilnummer' => $registrierung['mobilnummer'],
+    'name' => $registrierung['name'] ?? '',
+    'email' => $registrierung['email'] ?? '',
+    'mobilnummer' => $registrierung['mobilnummer'] ?? '',
     'registrier_nummer' => $registrierung['anmeldung_id'],
     'turnier' => $aktuellesTurnier
 ];

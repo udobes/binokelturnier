@@ -18,8 +18,13 @@ if ($startnummer < 1 || $runde < 1) {
 
 $db = getDB();
 
-// Name aus turnier_registrierungen holen
-$stmt = $db->prepare("SELECT name FROM turnier_registrierungen WHERE turnier_id = ? AND startnummer = ?");
+// Name aus turnier_registrierungen holen (mit JOIN zu anmeldungen)
+$stmt = $db->prepare("
+    SELECT a.name 
+    FROM turnier_registrierungen tr
+    LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
+    WHERE tr.turnier_id = ? AND tr.startnummer = ?
+");
 $stmt->execute([$aktuellesTurnier['id'], $startnummer]);
 $registrierung = $stmt->fetch(PDO::FETCH_ASSOC);
 

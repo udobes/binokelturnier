@@ -201,7 +201,7 @@ if ($aktuellesTurnier) {
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            max-width: 1000px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         h1 {
@@ -491,6 +491,21 @@ if ($aktuellesTurnier) {
             opacity: 0.5;
             cursor: wait !important;
         }
+        .icon-btn-namenschild {
+            background: #17a2b8;
+            color: white;
+            padding: 6px 10px;
+            font-weight: 500;
+        }
+        .icon-btn-namenschild:hover {
+            background: #138496;
+        }
+        .icon-btn-container {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            white-space: nowrap;
+        }
         .btn-print {
             background: #28a745;
             color: white;
@@ -667,6 +682,41 @@ if ($aktuellesTurnier) {
             // Browser-Druckdialog öffnen
             window.print();
         }
+        
+        function druckeNamenschild(startnummer) {
+            if (!startnummer || startnummer <= 0) {
+                alert('Keine gültige Startnummer gefunden.');
+                return;
+            }
+            
+            // Namenschild drucken
+            fetch('drucke_namenschild.php?startnummer=' + startnummer, {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Debug-Informationen in der Konsole ausgeben
+                if (data.debug && Array.isArray(data.debug)) {
+                    console.log('=== DEBUG-Informationen Namenschild-Druck ===');
+                    data.debug.forEach(function(debugLine) {
+                        console.log(debugLine);
+                    });
+                    console.log('=== Ende Debug-Informationen ===');
+                }
+                
+                return data;
+            })
+            .then(data => {
+                if (!data.success) {
+                    alert('Fehler beim Drucken: ' + (data.message || 'Unbekannter Fehler'));
+                }
+                // Erfolgsmeldung entfernt - keine Meldung bei erfolgreichem Druck
+            })
+            .catch(error => {
+                console.error('Fehler:', error);
+                alert('Fehler beim Drucken des Namenschilds.');
+            });
+        }
     </script>
 </head>
 <body>
@@ -789,15 +839,15 @@ if ($aktuellesTurnier) {
             <?php if (empty($registrierungen)): ?>
                 <p style="color: #999;">Noch keine Teilnehmer registriert.</p>
             <?php else: ?>
-                <table>
+                <table id="registrierte-teilnehmer">
                     <thead>
                         <tr>
-                            <th>Startnummer</th>
-                            <th>Registriernummer</th>
-                            <th>Name</th>
-                            <th>E-Mail</th>
-                            <th>Mobilnummer</th>
-                            <th>Registriert am</th>
+                            <th data-sort-key="startnummer" class="sortable">Startnummer</th>
+                            <th data-sort-key="anmeldung_id" class="sortable">Registriernummer</th>
+                            <th data-sort-key="name" class="sortable">Name</th>
+                            <th data-sort-key="email" class="sortable">E-Mail</th>
+                            <th data-sort-key="mobilnummer" class="sortable">Mobilnummer</th>
+                            <th data-sort-key="registriert_am" class="sortable">Registriert am</th>
                             <th>Aktion</th>
                         </tr>
                     </thead>
@@ -811,11 +861,18 @@ if ($aktuellesTurnier) {
                                 <td><?php echo htmlspecialchars($reg['mobilnummer'] ?? '-'); ?></td>
                                 <td><?php echo htmlspecialchars($reg['registriert_am'] ?? '-'); ?></td>
                                 <td>
-                                    <button class="icon-btn icon-btn-print" onclick="druckeLaufzettel(<?php echo htmlspecialchars($reg['startnummer']); ?>)" title="Laufzettel drucken">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                                            <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
-                                        </svg>
-                                    </button>
+                                    <div class="icon-btn-container">
+                                        <button class="icon-btn icon-btn-print" onclick="druckeLaufzettel(<?php echo htmlspecialchars($reg['startnummer']); ?>)" title="Laufzettel drucken">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                                                <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+                                            </svg>
+                                        </button>
+                                        <button class="icon-btn icon-btn-namenschild" onclick="druckeNamenschild(<?php echo htmlspecialchars($reg['startnummer']); ?>)" title="Namenschild drucken">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                                                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -890,6 +947,140 @@ echo $laufzettelHTML;
             </div>
         </div>
     </div>
+    
+    <script>
+    (function () {
+        const table = document.getElementById('registrierte-teilnehmer');
+        if (!table) return;
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        if (!thead || !tbody) return;
+
+        const STORAGE_KEY = 'turnier_registrierung_sort';
+
+        function parseDate(value) {
+            if (!value || value === '-') return NaN;
+            // Expect formats like "YYYY-MM-DD HH:MM:SS"
+            const normalized = value.replace(' ', 'T');
+            const t = Date.parse(normalized);
+            return isNaN(t) ? Date.parse(value) : t;
+        }
+
+        function getCellValue(tr, idx) {
+            const cell = tr.children[idx];
+            return (cell ? cell.textContent : '').trim();
+        }
+
+        function sortRowsBy(columnIndex, key, direction) {
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const dirFactor = direction === 'desc' ? -1 : 1;
+            rows.sort((a, b) => {
+                const va = getCellValue(a, columnIndex);
+                const vb = getCellValue(b, columnIndex);
+
+                if (key === 'startnummer' || key === 'anmeldung_id') {
+                    const na = parseFloat(va.replace(',', '.')) || 0;
+                    const nb = parseFloat(vb.replace(',', '.')) || 0;
+                    return (na - nb) * dirFactor;
+                }
+                if (key === 'registriert_am') {
+                    const da = parseDate(va);
+                    const db = parseDate(vb);
+                    // Newest first when desc
+                    if (isNaN(da) && isNaN(db)) return 0;
+                    if (isNaN(da)) return -1 * dirFactor;
+                    if (isNaN(db)) return 1 * dirFactor;
+                    return (da - db) * dirFactor;
+                }
+                // String compare for others
+                return va.localeCompare(vb, 'de', { sensitivity: 'base' }) * dirFactor;
+            });
+            // Re-append rows in new order
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function clearIndicators(exceptTh) {
+            thead.querySelectorAll('th.sortable').forEach(th => {
+                if (th !== exceptTh) {
+                    th.removeAttribute('data-sort-dir');
+                    const label = th.getAttribute('data-label');
+                    if (label) th.textContent = label;
+                }
+            });
+        }
+
+        function applySorting(key, direction) {
+            // Find the column index
+            let columnIndex = -1;
+            let targetTh = null;
+            thead.querySelectorAll('th.sortable').forEach((th, index) => {
+                if (th.getAttribute('data-sort-key') === key) {
+                    columnIndex = index;
+                    targetTh = th;
+                }
+            });
+
+            if (columnIndex === -1 || !targetTh) return;
+
+            // Apply sorting
+            sortRowsBy(columnIndex, key, direction);
+
+            // Update indicators
+            clearIndicators(targetTh);
+            targetTh.setAttribute('data-sort-dir', direction);
+            const label = targetTh.getAttribute('data-label') || '';
+            const arrow = direction === 'asc' ? ' ▲' : ' ▼';
+            targetTh.textContent = label + arrow;
+
+            // Save to localStorage
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ key: key, direction: direction }));
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+        }
+
+        function loadSavedSorting() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const sort = JSON.parse(saved);
+                    if (sort.key && sort.direction) {
+                        applySorting(sort.key, sort.direction);
+                    }
+                }
+            } catch (e) {
+                // Ignore errors
+            }
+        }
+
+        // Set up click handlers
+        thead.querySelectorAll('th.sortable').forEach((th, index) => {
+            // Store original label
+            if (!th.getAttribute('data-label')) th.setAttribute('data-label', th.textContent.trim());
+
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', () => {
+                const key = th.getAttribute('data-sort-key');
+                if (!key) return;
+
+                // Determine direction: toggle, but default for 'registriert_am' is 'desc', otherwise 'asc'
+                let dir = th.getAttribute('data-sort-dir');
+                if (!dir) {
+                    dir = key === 'registriert_am' ? 'desc' : 'asc';
+                } else {
+                    dir = dir === 'asc' ? 'desc' : 'asc';
+                }
+
+                // Apply sorting (this will also save to localStorage)
+                applySorting(key, dir);
+            });
+        });
+
+        // Load saved sorting on page load
+        loadSavedSorting();
+    })();
+    </script>
 </body>
 </html>
 

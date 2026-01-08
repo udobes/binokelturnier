@@ -22,7 +22,7 @@ if (!$aktuellesTurnier) {
                 padding: 30px;
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                max-width: 1200px;
+                max-width: 1400px;
                 margin: 0 auto;
             }
             h1 {
@@ -148,7 +148,12 @@ if ($aktiveErgebnisRunde !== null) {
         $runde = intval($aktiveErgebnisRunde);
         
         // Alle Registrierungen laden
-        $stmt = $db->prepare("SELECT startnummer, name FROM turnier_registrierungen WHERE turnier_id = ?");
+        $stmt = $db->prepare("
+            SELECT tr.startnummer, a.name 
+            FROM turnier_registrierungen tr
+            LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
+            WHERE tr.turnier_id = ?
+        ");
         $stmt->execute([$aktuellesTurnier['id']]);
         $alleRegistrierungen = $stmt->fetchAll(PDO::FETCH_ASSOC);
         

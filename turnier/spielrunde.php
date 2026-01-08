@@ -27,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $punkte = isset($_POST['punkte']) && $_POST['punkte'] !== '' ? intval($_POST['punkte']) : null;
     
     if ($startnummer > 0 && $runde >= 1 && $runde <= $anzahlRunden) {
-        // Prüfen, ob Teilnehmer existiert
-        $stmt = $db->prepare("SELECT * FROM turnier_registrierungen WHERE turnier_id = ? AND startnummer = ?");
+        // Prüfen, ob Teilnehmer existiert (nur ID prüfen)
+        $stmt = $db->prepare("SELECT id FROM turnier_registrierungen WHERE turnier_id = ? AND startnummer = ?");
         $stmt->execute([$aktuellesTurnier['id'], $startnummer]);
         $registrierung = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -59,8 +59,13 @@ if (isset($_GET['success']) && $_GET['success'] == '1') {
 // Daten für die Runden-Tabelle laden
 $rundenErgebnisse = [];
 if ($aktuellesTurnier) {
-    // Alle Registrierungen laden
-    $stmt = $db->prepare("SELECT startnummer, name FROM turnier_registrierungen WHERE turnier_id = ?");
+    // Alle Registrierungen laden (mit JOIN zu anmeldungen für Name)
+    $stmt = $db->prepare("
+        SELECT tr.startnummer, a.name 
+        FROM turnier_registrierungen tr
+        LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
+        WHERE tr.turnier_id = ?
+    ");
     $stmt->execute([$aktuellesTurnier['id']]);
     $alleRegistrierungen = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -180,7 +185,7 @@ if ($aktuellesTurnier) {
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            max-width: 1000px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         h1 {
