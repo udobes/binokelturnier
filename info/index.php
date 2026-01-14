@@ -1,6 +1,15 @@
 <?php
+session_start();
 require_once __DIR__ . '/../turnier/config.php';
 initTurnierDB();
+
+// Startnummer verarbeiten, falls gesendet
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['startnummer'])) {
+    $startnummer = trim($_POST['startnummer']);
+    if (is_numeric($startnummer) && intval($startnummer) > 0) {
+        $_SESSION['startnummer'] = intval($startnummer);
+    }
+}
 
 $aktuellesTurnier = getAktuellesTurnier();
 if (!$aktuellesTurnier) {
@@ -9,6 +18,7 @@ if (!$aktuellesTurnier) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="refresh" content="60">
         <link rel="icon" type="image/x-icon" href="../img/AKS-Logo.ico">
         <title>Turnier Info</title>
         <style>
@@ -58,6 +68,7 @@ $aktiveRunde = isset($aktuellesTurnier['aktive_runde']) && $aktuellesTurnier['ak
 $personenZuordnung = [];
 $tischZuordnungen = [];
 $tischeGruppiert = [];
+$spielerTisch = null;
 if ($aktiveRunde !== null) {
     // Personenzuordnung für die aktive Runde abrufen
     $stmt = $db->prepare("
@@ -88,6 +99,17 @@ if ($aktiveRunde !== null) {
         $tischeGruppiert[$tisch][] = $zuordnung['spieler_id'];
     }
     ksort($tischeGruppiert);
+
+    // Tisch für die aktuelle Startnummer (Startnummer = Spieler-/Personnummer) ermitteln
+    if (isset($_SESSION['startnummer']) && $_SESSION['startnummer'] !== '') {
+        $startnummerFuerTisch = intval($_SESSION['startnummer']);
+        foreach ($personenZuordnung as $zuordnung) {
+            if (intval($zuordnung['spieler_id']) === $startnummerFuerTisch) {
+                $spielerTisch = $zuordnung['tisch'];
+                break;
+            }
+        }
+    }
 }
 
 // Ergebnisse laden, falls aktiviert
@@ -95,6 +117,15 @@ $aktiveErgebnisRunde = isset($aktuellesTurnier['aktive_ergebnis_runde']) ? $aktu
 $ergebnisseMitRunden = [];
 $rundenErgebnisse = [];
 $anzahlRunden = intval($aktuellesTurnier['anzahl_runden'] ?? 3);
+
+// Merken, ob bereits eine Startnummer hinterlegt ist
+$hatStartnummer = isset($_SESSION['startnummer']) && $_SESSION['startnummer'] !== '';
+// Startnummer der aktuellen Person (unabhängig von Tisch-/Rundenzuordnung)
+$startnummerAktuell = $hatStartnummer ? intval($_SESSION['startnummer']) : null;
+
+// Ergebnis-Infos für die aktuelle Startnummer
+$spielerPunkte = null;
+$spielerPlatz = null;
 
 if ($aktiveErgebnisRunde !== null) {
     if ($aktiveErgebnisRunde == 0) {
@@ -134,6 +165,21 @@ if ($aktiveErgebnisRunde !== null) {
         }
         unset($ergebnis);
         
+        // Ergebnis für aktuelle Startnummer (Gesamt) ermitteln
+        if ($startnummerAktuell !== null) {
+            foreach ($ergebnisseMitRunden as $erg) {
+                if (intval($erg['startnummer']) === $startnummerAktuell) {
+                    if ($erg['gesamtpunkte'] !== null) {
+                        $spielerPunkte = intval($erg['gesamtpunkte']);
+                    }
+                    if (isset($erg['platzierung']) && $erg['platzierung'] !== null) {
+                        $spielerPlatz = intval($erg['platzierung']);
+                    }
+                    break;
+                }
+            }
+        }
+
         // Zurück nach Gesamtpunkten sortieren
         usort($ergebnisseMitRunden, function($a, $b) {
             $punkteA = $a['gesamtpunkte'] !== null ? intval($a['gesamtpunkte']) : -1;
@@ -206,6 +252,21 @@ if ($aktiveErgebnisRunde !== null) {
             $ergebnis['platzierung'] = $platzierungen[$ergebnis['startnummer']] ?? null;
         }
         unset($ergebnis);
+
+        // Ergebnis für aktuelle Startnummer (Einzelrunde) ermitteln
+        if ($startnummerAktuell !== null) {
+            foreach ($rundenErgebnisse as $erg) {
+                if (intval($erg['startnummer']) === $startnummerAktuell) {
+                    if ($erg['punkte'] !== null) {
+                        $spielerPunkte = intval($erg['punkte']);
+                    }
+                    if (isset($erg['platzierung']) && $erg['platzierung'] !== null) {
+                        $spielerPlatz = intval($erg['platzierung']);
+                    }
+                    break;
+                }
+            }
+        }
     }
 }
 ?><!DOCTYPE html>
@@ -213,7 +274,7 @@ if ($aktiveErgebnisRunde !== null) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="60">
+    <meta http-equiv="refresh" content="30">
     <link rel="icon" type="image/x-icon" href="../img/AKS-Logo.ico">
     <title>Turnier Info<?php echo $aktiveRunde !== null ? ' - Runde ' . $aktiveRunde : ''; ?></title>
     <style>
@@ -306,6 +367,74 @@ if ($aktiveErgebnisRunde !== null) {
             margin-bottom: 20px;
             border-left: 4px solid #667eea;
         }
+        .welcome-box {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            margin-bottom: 30px;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .welcome-box h2 {
+            color: white;
+            margin: 0 0 15px 0;
+            font-size: 24px;
+        }
+        .startnummer-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .startnummer-form input[type="number"] {
+            padding: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 5px;
+            font-size: 16px;
+            width: 150px;
+            background: rgba(255,255,255,0.9);
+        }
+        .startnummer-form input[type="number"]:focus {
+            outline: none;
+            border-color: white;
+            background: white;
+        }
+        .startnummer-form button {
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .startnummer-form button:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .startnummer-angezeigt {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .startnummer-hervorgehoben {
+            display: inline-block;
+            padding: 5px 15px;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        .startnummer-hervorgehoben:hover {
+            background: #f8f8f8;
+        }
     </style>
     <script>
         var currentSortColumn = {};
@@ -387,17 +516,77 @@ if ($aktiveErgebnisRunde !== null) {
                 tbody.appendChild(row);
             });
         }
+
+        // Formular für Startnummer ein-/ausblenden
+        document.addEventListener('DOMContentLoaded', function() {
+            var hatStartnummer = <?php echo $hatStartnummer ? 'true' : 'false'; ?>;
+            var welcomeBox = document.getElementById('welcome-box');
+            var klickElement = document.getElementById('startnummer-klick-info');
+
+            if (hatStartnummer && welcomeBox) {
+                // Wenn es schon eine Startnummer gibt, welcome-box ausblenden
+                welcomeBox.style.display = 'none';
+            }
+
+            if (klickElement && welcomeBox) {
+                klickElement.addEventListener('click', function() {
+                    // Bei Klick auf die Startnummer das Formular zum Ändern wieder anzeigen
+                    welcomeBox.style.display = 'block';
+                    var input = document.getElementById('startnummer');
+                    if (input) {
+                        input.focus();
+                    }
+                });
+            }
+        });
     </script>
 </head>
 <body>
     <div class="container">
+        <div class="welcome-box" id="welcome-box">
+            <h2>Willkommen zum Binokel-Turnier!</h2>
+            <form method="POST" action="" class="startnummer-form" id="startnummer-form-wrapper">
+                <label for="startnummer" style="color: white; font-weight: bold;">Ihre Startnummer:</label>
+                <input type="number" id="startnummer" name="startnummer" min="1" placeholder="Startnummer eingeben" value="<?php echo isset($_SESSION['startnummer']) ? htmlspecialchars($_SESSION['startnummer']) : ''; ?>" required>
+                <button type="submit">Speichern</button>
+            </form>
+        </div>
+        
         <h1><?php echo htmlspecialchars($aktuellesTurnier['titel']); ?></h1>
         
         <div class="info-box">
             <p><strong>Datum:</strong> <?php echo htmlspecialchars($aktuellesTurnier['datum']); ?></p>
             <p><strong>Ort:</strong> <?php echo htmlspecialchars($aktuellesTurnier['ort']); ?></p>
+            <?php if (isset($_SESSION['startnummer']) && $_SESSION['startnummer'] !== ''): ?>
+                <p>
+                    <strong>Startnummer:</strong>
+                    <span class="startnummer-hervorgehoben" id="startnummer-klick-info" title="Klicken, um die Startnummer zu ändern">
+                        <?php echo htmlspecialchars($_SESSION['startnummer']); ?>
+                    </span>
+                </p>
+            <?php endif; ?>
             <?php if ($aktiveRunde !== null): ?>
+                <p>&nbsp;</p>
                 <p><strong>Aktive Runde:</strong> <?php echo $aktiveRunde; ?></p>
+                <?php if ($spielerTisch !== null && $startnummerAktuell !== null): ?>
+                    <p>Person <?php echo htmlspecialchars($startnummerAktuell); ?> - Tisch <?php echo htmlspecialchars($spielerTisch); ?></p>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if ($aktiveErgebnisRunde !== null && $startnummerAktuell !== null): ?>
+                <?php
+                    $punkteText = ($spielerPunkte !== null) ? htmlspecialchars($spielerPunkte) : '-';
+                    $platzText = ($spielerPlatz !== null) ? htmlspecialchars($spielerPlatz) : '-';
+                ?>
+                <?php if ($aktiveErgebnisRunde == 0): ?>
+                    <p>&nbsp;</p>
+                    <p><strong>Auswertung Gesamt:</strong></p>
+                    <p>Gesamt: Punkte <?php echo $punkteText; ?> - Platz <?php echo $platzText; ?></p>
+                <?php else: ?>
+                    <p>&nbsp;</p>
+                    <p><strong>Auswertung Runde <?php echo htmlspecialchars($aktiveErgebnisRunde); ?>:</strong></p>
+                    <p>Runde <?php echo htmlspecialchars($aktiveErgebnisRunde); ?>: Punkte <?php echo $punkteText; ?> - Platz <?php echo $platzText; ?></p>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
         
