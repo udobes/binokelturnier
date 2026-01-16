@@ -59,9 +59,9 @@ if (isset($_GET['success']) && $_GET['success'] == '1') {
 // Daten für die Runden-Tabelle laden
 $rundenErgebnisse = [];
 if ($aktuellesTurnier) {
-    // Alle Registrierungen laden (mit JOIN zu anmeldungen für Name)
+    // Alle Registrierungen laden (mit JOIN zu anmeldungen für Name und name_auf_wertungsliste)
     $stmt = $db->prepare("
-        SELECT tr.startnummer, a.name 
+        SELECT tr.startnummer, a.name, a.name_auf_wertungsliste 
         FROM turnier_registrierungen tr
         LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
         WHERE tr.turnier_id = ?
@@ -76,6 +76,7 @@ if ($aktuellesTurnier) {
         $alleErgebnisse[] = [
             'startnummer' => $reg['startnummer'],
             'name' => $reg['name'],
+            'name_auf_wertungsliste' => isset($reg['name_auf_wertungsliste']) ? intval($reg['name_auf_wertungsliste']) : 0,
             'punkte' => $ergebnis ? $ergebnis['punkte'] : null,
             'eingetragen_am' => $ergebnis ? $ergebnis['geaendert_am'] : null
         ];
@@ -380,6 +381,7 @@ if ($aktuellesTurnier) {
             }
             
             // HTML-Inhalt der Tabelle kopieren (inkl. thead)
+            // Namen wurden bereits im PHP ausgeblendet, wenn name_auf_wertungsliste nicht aktiviert ist
             var tabelleHTML = tabelleElement.outerHTML;
             
             // Neues Fenster öffnen
@@ -533,7 +535,7 @@ if ($aktuellesTurnier) {
                             <div>
                                 <strong>Anzahl Spieler im Turnier: <?php echo $anzahlSpieler; ?> / Anzahl eingetragener Ergebnisse: <?php echo $anzahlEingetragen; ?></strong>
                             </div>
-                            <button type="button" class="btn-print" onclick="druckeTabelle('runde', <?php echo $gewaehlteRunde; ?>)">Drucken</button>
+                            <button type="button" class="btn-print" onclick="druckeTabelle(<?php echo $gewaehlteRunde; ?>)">Drucken</button>
                         </div>
                         <table id="tabelle-runde-<?php echo $gewaehlteRunde; ?>">
                             <thead>
@@ -553,7 +555,7 @@ if ($aktuellesTurnier) {
                                     <?php foreach ($rundenErgebnisse as $ergebnis): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($ergebnis['startnummer']); ?></td>
-                                            <td><?php echo htmlspecialchars($ergebnis['name']); ?></td>
+                                            <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                             <td><?php echo $ergebnis['punkte'] !== null ? htmlspecialchars($ergebnis['punkte']) : '-'; ?></td>
                                             <td><?php echo $ergebnis['platzierung'] !== null ? htmlspecialchars($ergebnis['platzierung']) . '.' : '-'; ?></td>
                                         </tr>

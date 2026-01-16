@@ -44,16 +44,19 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
     $csvContent .= "\xEF\xBB\xBF";
     
     // Header-Zeile
-    $csvContent .= "ID;Name;E-Mail;Mobilnummer;Anmeldedatum;E-Mail gesendet;E-Mail gelesen\n";
+    $csvContent .= "ID;Name;E-Mail;Mobilnummer;Alter;Name auf Wertungsliste;Anmeldedatum;E-Mail gesendet;E-Mail gelesen\n";
     
     // Daten-Zeilen
     foreach ($anmeldungen as $anmeldung) {
+        $nameAufWertungsliste = (isset($anmeldung['name_auf_wertungsliste']) && $anmeldung['name_auf_wertungsliste'] == 1) ? 'Ja' : 'Nein';
         $csvContent .= sprintf(
-            "%s;%s;%s;%s;%s;%s;%s\n",
+            "%s;%s;%s;%s;%s;%s;%s;%s;%s\n",
             $anmeldung['id'],
             str_replace(';', ',', $anmeldung['name']),
             str_replace(';', ',', $anmeldung['email']),
             str_replace(';', ',', $anmeldung['mobilnummer'] ?? ''),
+            $anmeldung['alter'] ?? '',
+            $nameAufWertungsliste,
             $anmeldung['anmeldedatum'] ?? '',
             $anmeldung['email_gesendet'] ?? '',
             $anmeldung['email_gelesen'] ?? ''
@@ -627,6 +630,8 @@ if ($selectedTurnierId) {
                     <th class="name-column">Name</th>
                     <th class="email-column">E-Mail</th>
                     <th>Mobilnummer</th>
+                    <th>Alter</th>
+                    <th>Name auf Wertungsliste</th>
                     <th>Anmeldedatum</th>
                     <th>E-Mail gesendet</th>
                     <th>E-Mail gelesen</th>
@@ -641,6 +646,8 @@ if ($selectedTurnierId) {
                         <td class="name-column name-<?php echo $anmeldung['id']; ?>"><?php echo htmlspecialchars($anmeldung['name']); ?></td>
                         <td class="email-column email-<?php echo $anmeldung['id']; ?>"><?php echo htmlspecialchars($anmeldung['email']); ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['mobilnummer'] ?? '-'); ?></td>
+                        <td><?php echo htmlspecialchars($anmeldung['alter'] ?? '-'); ?></td>
+                        <td><?php echo (isset($anmeldung['name_auf_wertungsliste']) && $anmeldung['name_auf_wertungsliste'] == 1) ? 'Ja' : 'Nein'; ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['anmeldedatum'] ?? '-'); ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['email_gesendet'] ?? '-'); ?></td>
                         <td><?php echo htmlspecialchars($anmeldung['email_gelesen'] ?? '-'); ?></td>
@@ -676,7 +683,7 @@ if ($selectedTurnierId) {
                         </td>
                     </tr>
                     <tr id="edit-<?php echo $anmeldung['id']; ?>" class="edit-form">
-                        <td colspan="9">
+                        <td colspan="11">
                             <form method="POST" onsubmit="return confirm('Änderungen speichern?');">
                                 <input type="hidden" name="action" value="update">
                                 <input type="hidden" name="id" value="<?php echo $anmeldung['id']; ?>">

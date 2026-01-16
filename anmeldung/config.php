@@ -60,6 +60,16 @@ function initDB() {
     } catch (PDOException $e) {
         // Spalte existiert bereits, ignorieren
     }
+    try {
+        $db->exec("ALTER TABLE anmeldungen ADD COLUMN \"alter\" INTEGER");
+    } catch (PDOException $e) {
+        // Spalte existiert bereits, ignorieren
+    }
+    try {
+        $db->exec("ALTER TABLE anmeldungen ADD COLUMN name_auf_wertungsliste INTEGER DEFAULT 0");
+    } catch (PDOException $e) {
+        // Spalte existiert bereits, ignorieren
+    }
     
     // Konfigurationstabelle für Admin-Einstellungen erstellen
     $db->exec("CREATE TABLE IF NOT EXISTS config (

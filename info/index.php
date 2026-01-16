@@ -193,9 +193,9 @@ if ($aktiveErgebnisRunde !== null) {
         // Ergebnisse für eine spezifische Runde
         $runde = intval($aktiveErgebnisRunde);
         
-        // Alle Registrierungen laden
+        // Alle Registrierungen laden (mit name_auf_wertungsliste)
         $stmt = $db->prepare("
-            SELECT tr.startnummer, a.name 
+            SELECT tr.startnummer, a.name, a.name_auf_wertungsliste 
             FROM turnier_registrierungen tr
             LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
             WHERE tr.turnier_id = ?
@@ -210,6 +210,7 @@ if ($aktiveErgebnisRunde !== null) {
             $alleErgebnisse[] = [
                 'startnummer' => $reg['startnummer'],
                 'name' => $reg['name'],
+                'name_auf_wertungsliste' => isset($reg['name_auf_wertungsliste']) ? intval($reg['name_auf_wertungsliste']) : 0,
                 'punkte' => $ergebnis ? $ergebnis['punkte'] : null
             ];
         }
@@ -585,7 +586,7 @@ if ($aktiveErgebnisRunde !== null) {
                 <?php else: ?>
                     <p>&nbsp;</p>
                     <p><strong>Auswertung Runde <?php echo htmlspecialchars($aktiveErgebnisRunde); ?>:</strong></p>
-                    <p>Runde <?php echo htmlspecialchars($aktiveErgebnisRunde); ?>: Punkte <?php echo $punkteText; ?> - Platz <?php echo $platzText; ?></p>
+                    <p>Runde <?php echo htmlspecialchars($aktiveErgebnisRunde); ?>:<br> Punkte <?php echo $punkteText; ?> - Platz <?php echo $platzText; ?></p>
                 <?php endif; ?>
             <?php endif; ?>
         </div>
@@ -678,7 +679,7 @@ if ($aktiveErgebnisRunde !== null) {
                         <?php foreach ($ergebnisseMitRunden as $ergebnis): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($ergebnis['startnummer']); ?></td>
-                                <td><?php echo htmlspecialchars($ergebnis['name']); ?></td>
+                                <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                 <?php for ($i = 1; $i <= $anzahlRunden; $i++): ?>
                                     <td><?php echo isset($ergebnis['runde' . $i . '_punkte']) && $ergebnis['runde' . $i . '_punkte'] !== null ? htmlspecialchars($ergebnis['runde' . $i . '_punkte']) : '-'; ?></td>
                                 <?php endfor; ?>
@@ -703,7 +704,7 @@ if ($aktiveErgebnisRunde !== null) {
                         <?php foreach ($rundenErgebnisse as $ergebnis): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($ergebnis['startnummer']); ?></td>
-                                <td><?php echo htmlspecialchars($ergebnis['name']); ?></td>
+                                <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                 <td><?php echo $ergebnis['punkte'] !== null ? htmlspecialchars($ergebnis['punkte']) : '-'; ?></td>
                                 <td><?php echo $ergebnis['platzierung'] !== null ? htmlspecialchars($ergebnis['platzierung']) . '.' : '-'; ?></td>
                             </tr>

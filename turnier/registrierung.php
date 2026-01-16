@@ -33,7 +33,7 @@ if (isset($_POST['uebernehme_anderes_turnier'])) {
         $stmt->execute([$aktuellesTurnier['id'], $registrierNummer]);
         
         // Daten neu laden
-        $stmt = $db->prepare("SELECT id, name, email, mobilnummer, turnier_id FROM anmeldungen WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, name, email, mobilnummer, \"alter\", name_auf_wertungsliste, turnier_id FROM anmeldungen WHERE id = ?");
         $stmt->execute([$registrierNummer]);
         $anmeldungDaten = $stmt->fetch(PDO::FETCH_ASSOC);
         $registrierNummerEingabe = $registrierNummer;
@@ -51,7 +51,7 @@ if (isset($_POST['lade_daten'])) {
         $error = "Bitte geben Sie eine gültige Registriernummer ein.";
     } else {
         $db = getDB();
-        $stmt = $db->prepare("SELECT id, name, email, mobilnummer, turnier_id FROM anmeldungen WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, name, email, mobilnummer, \"alter\", name_auf_wertungsliste, turnier_id FROM anmeldungen WHERE id = ?");
         $stmt->execute([$registrierNummer]);
         $anmeldungDaten = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -84,6 +84,8 @@ if (isset($_POST['registrierung_nummer'])) {
         $name = trim($_POST['name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $mobilnummer = trim($_POST['mobilnummer'] ?? '');
+        $alter = isset($_POST['alter']) && !empty($_POST['alter']) ? intval($_POST['alter']) : null;
+        $nameAufWertungsliste = isset($_POST['name_auf_wertungsliste']) && $_POST['name_auf_wertungsliste'] == '1' ? 1 : 0;
         
         if ($registrierNummer < 1) {
             $error = "Bitte geben Sie eine gültige Registriernummer ein.";
@@ -94,7 +96,7 @@ if (isset($_POST['registrierung_nummer'])) {
             if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $error = "Bitte geben Sie eine gültige E-Mail-Adresse ein.";
             } else {
-                $result = registriereDurchNummerMitDaten($aktuellesTurnier['id'], $registrierNummer, $name, !empty($email) ? $email : null, !empty($mobilnummer) ? $mobilnummer : null);
+                $result = registriereDurchNummerMitDaten($aktuellesTurnier['id'], $registrierNummer, $name, !empty($email) ? $email : null, !empty($mobilnummer) ? $mobilnummer : null, $alter, $nameAufWertungsliste);
                 if ($result['success']) {
                     // Turnierzuordnung in anmeldungen aktualisieren, falls noch nicht geschehen
                     $db = getDB();
@@ -103,6 +105,11 @@ if (isset($_POST['registrierung_nummer'])) {
                     
                     // Session-Variable löschen
                     unset($_SESSION['pending_turnier_wechsel']);
+                    
+                    // Erfolgsmeldung vorbereiten
+                    $successMessage = isset($result['updated']) && $result['updated'] 
+                        ? "Daten wurden erfolgreich aktualisiert." 
+                        : "Registrierung erfolgreich abgeschlossen.";
                     
                     // Daten für Laufzettel-Overlay vorbereiten
                     $laufzettelDaten = [
@@ -114,6 +121,7 @@ if (isset($_POST['registrierung_nummer'])) {
                         'turnier' => $aktuellesTurnier
                     ];
                     $_SESSION['laufzettel_daten'] = $laufzettelDaten;
+                    $_SESSION['success_message'] = $successMessage;
                     header('Location: registrierung.php?show_laufzettel=1');
                     exit;
                 } else {
@@ -132,6 +140,8 @@ if (isset($_POST['registrierung_neu'])) {
         $name = trim($_POST['name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $mobilnummer = trim($_POST['mobilnummer'] ?? '');
+        $alter = isset($_POST['alter']) && !empty($_POST['alter']) ? intval($_POST['alter']) : null;
+        $nameAufWertungsliste = isset($_POST['name_auf_wertungsliste']) && $_POST['name_auf_wertungsliste'] == '1' ? 1 : 0;
         
         if (empty($name)) {
             $error = "Bitte geben Sie einen Namen ein.";
@@ -140,18 +150,26 @@ if (isset($_POST['registrierung_neu'])) {
             if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $error = "Bitte geben Sie eine gültige E-Mail-Adresse ein.";
             } else {
-                $result = registriereNeuePerson($aktuellesTurnier['id'], $name, !empty($email) ? $email : null, !empty($mobilnummer) ? $mobilnummer : null);
+                $result = registriereNeuePerson($aktuellesTurnier['id'], $name, !empty($email) ? $email : null, !empty($mobilnummer) ? $mobilnummer : null, $alter, $nameAufWertungsliste);
                 if ($result['success']) {
+                    // Erfolgsmeldung mit Registriernummer vorbereiten
+                    $registrierNummer = $result['anmeldung_id'] ?? null;
+                    $successMessage = "Registrierung erfolgreich abgeschlossen.";
+                    if ($registrierNummer) {
+                        $successMessage .= " Registriernummer: " . $registrierNummer;
+                    }
+                    
                     // Daten für Laufzettel-Overlay vorbereiten
                     $laufzettelDaten = [
                         'startnummer' => $result['startnummer'],
                         'name' => $name,
                         'email' => $email,
                         'mobilnummer' => $mobilnummer,
-                        'registrier_nummer' => $result['anmeldung_id'] ?? null,
+                        'registrier_nummer' => $registrierNummer,
                         'turnier' => $aktuellesTurnier
                     ];
                     $_SESSION['laufzettel_daten'] = $laufzettelDaten;
+                    $_SESSION['success_message'] = $successMessage;
                     header('Location: registrierung.php?show_laufzettel=1');
                     exit;
                 } else {
@@ -165,6 +183,12 @@ if (isset($_POST['registrierung_neu'])) {
 // Erfolgsmeldung aus URL holen
 if (isset($_GET['message'])) {
     $successMessage = urldecode($_GET['message']);
+}
+
+// Erfolgsmeldung aus Session holen (falls vorhanden)
+if (isset($_SESSION['success_message'])) {
+    $successMessage = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
 }
 
 // Alle Registrierungen für aktuelles Turnier holen
@@ -220,6 +244,19 @@ if ($aktuellesTurnier) {
             margin-bottom: 8px;
             color: #333;
             font-weight: 500;
+        }
+        .checkbox-group {
+            margin-bottom: 20px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .checkbox-label input[type="checkbox"] {
+            margin-right: 8px;
+            width: auto;
+            max-width: none;
         }
         input[type="text"],
         input[type="number"],
@@ -724,7 +761,7 @@ if ($aktuellesTurnier) {
     <div class="container">
         <h1>Registrierung</h1>
         
-        <?php if ($success && $successMessage): ?>
+        <?php if ($successMessage): ?>
             <div class="message success">
                 <?php echo htmlspecialchars($successMessage); ?>
             </div>
@@ -805,6 +842,16 @@ if ($aktuellesTurnier) {
                             <input type="tel" id="mobilnummer" name="mobilnummer" value="<?php echo htmlspecialchars($anmeldungDaten['mobilnummer'] ?? ''); ?>" placeholder="z.B. 0171 1234567">
                             <div class="small-text">Optional - kann ergänzt werden</div>
                         </div>
+                        <div class="form-group">
+                            <label for="alter">Alter</label>
+                            <input type="text" id="alter" name="alter" value="<?php echo htmlspecialchars($anmeldungDaten['alter'] ?? ''); ?>" placeholder="z.B. 35">
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="name_auf_wertungsliste" name="name_auf_wertungsliste" value="1" <?php echo (!isset($anmeldungDaten['name_auf_wertungsliste']) || $anmeldungDaten['name_auf_wertungsliste'] != 0) ? 'checked' : ''; ?>>
+                                <span>Mein Name darf auf den Wertungslisten genannt werden</span>
+                            </label>
+                        </div>
                         <div style="display: flex; gap: 10px;">
                             <button type="submit" class="btn" <?php echo $anderesTurnier ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''; ?>>Registrieren</button>
                             <button type="button" class="btn" style="background: #6c757d;" onclick="window.location.href='registrierung.php'">Abbrechen</button>
@@ -831,6 +878,16 @@ if ($aktuellesTurnier) {
                         <input type="tel" id="mobilnummer" name="mobilnummer" placeholder="z.B. 0171 1234567">
                         <div class="small-text">Optional</div>
                     </div>
+                    <div class="form-group">
+                        <label for="alter">Alter</label>
+                        <input type="text" id="alter" name="alter" placeholder="z.B. 35">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="name_auf_wertungsliste_neu" name="name_auf_wertungsliste" value="1" checked="checked">
+                            <span>Mein Name darf auf den Wertungslisten genannt werden</span>
+                        </label>
+                    </div>
                     <button type="submit" class="btn">Registrieren</button>
                 </form>
             </div>
@@ -847,6 +904,7 @@ if ($aktuellesTurnier) {
                             <th data-sort-key="name" class="sortable">Name</th>
                             <th data-sort-key="email" class="sortable">E-Mail</th>
                             <th data-sort-key="mobilnummer" class="sortable">Mobilnummer</th>
+                            <th data-sort-key="name_auf_wertungsliste" class="sortable">Name in Wertungsliste</th>
                             <th data-sort-key="registriert_am" class="sortable">Registriert am</th>
                             <th>Aktion</th>
                         </tr>
@@ -859,6 +917,7 @@ if ($aktuellesTurnier) {
                                 <td><?php echo htmlspecialchars($reg['name']); ?></td>
                                 <td><?php echo htmlspecialchars($reg['email'] ?? '-'); ?></td>
                                 <td><?php echo htmlspecialchars($reg['mobilnummer'] ?? '-'); ?></td>
+                                <td><?php echo (isset($reg['name_auf_wertungsliste']) && $reg['name_auf_wertungsliste'] == 1) ? 'Ja' : 'Nein'; ?></td>
                                 <td><?php echo htmlspecialchars($reg['registriert_am'] ?? '-'); ?></td>
                                 <td>
                                     <div class="icon-btn-container">
@@ -908,6 +967,9 @@ $laufzettelHTML .= '<div class="info-row"><span class="info-label">Datum:</span>
 $laufzettelHTML .= '</div>';
 $laufzettelHTML .= '<div class="laufzettel-spieler">';
 $laufzettelHTML .= '<div class="info-row"><span class="info-label">Spieler Nr:</span> <span class="info-value info-value-large">' . htmlspecialchars($laufzettelDaten['startnummer'], ENT_QUOTES, 'UTF-8') . '</span></div>';
+if (!empty($laufzettelDaten['registrier_nummer'])) {
+    $laufzettelHTML .= '<div class="info-row"><span class="info-label info-label-small">Registriernummer:</span> <span class="info-value info-value-small">' . htmlspecialchars($laufzettelDaten['registrier_nummer'], ENT_QUOTES, 'UTF-8') . '</span></div>';
+}
 $laufzettelHTML .= '<div class="info-row"><span class="info-label info-label-small">Name:</span> <span class="info-value info-value-small">' . htmlspecialchars($laufzettelDaten['name'], ENT_QUOTES, 'UTF-8') . '</span></div>';
 if (!empty($laufzettelDaten['email'])) {
     $laufzettelHTML .= '<div class="info-row"><span class="info-label info-label-small">Email:</span> <span class="info-value info-value-small">' . htmlspecialchars($laufzettelDaten['email'], ENT_QUOTES, 'UTF-8') . '</span></div>';
@@ -991,6 +1053,12 @@ echo $laufzettelHTML;
                     if (isNaN(da)) return -1 * dirFactor;
                     if (isNaN(db)) return 1 * dirFactor;
                     return (da - db) * dirFactor;
+                }
+                if (key === 'name_auf_wertungsliste') {
+                    // Sortiere "Ja" vor "Nein"
+                    const aVal = va.toLowerCase() === 'ja' ? 1 : 0;
+                    const bVal = vb.toLowerCase() === 'ja' ? 1 : 0;
+                    return (aVal - bVal) * dirFactor;
                 }
                 // String compare for others
                 return va.localeCompare(vb, 'de', { sensitivity: 'base' }) * dirFactor;

@@ -14,6 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $name = trim($_POST['name'] ?? '');
 $email = trim($_POST['email'] ?? '');
 $mobilnummer = trim($_POST['mobilnummer'] ?? '');
+$alter = isset($_POST['alter']) && !empty($_POST['alter']) ? intval($_POST['alter']) : null;
+$nameAufWertungsliste = isset($_POST['name_auf_wertungsliste']) && $_POST['name_auf_wertungsliste'] == '1' ? 1 : 0;
 $turnierId = isset($_POST['turnier_id']) && !empty($_POST['turnier_id']) ? intval($_POST['turnier_id']) : null;
 $datenschutz = isset($_POST['datenschutz']) && $_POST['datenschutz'] == '1';
 
@@ -71,7 +73,7 @@ if ($turnierId) {
 
 // Validierung
 if (empty($name) || empty($email)) {
-    $redirectParams = 'error=empty&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer);
+    $redirectParams = 'error=empty&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -80,7 +82,7 @@ if (empty($name) || empty($email)) {
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $redirectParams = 'error=email&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer);
+    $redirectParams = 'error=email&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -89,7 +91,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 }
 
 if (!$datenschutz) {
-    $redirectParams = 'error=datenschutz&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer);
+    $redirectParams = 'error=datenschutz&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -105,8 +107,8 @@ try {
     $anmeldedatum = date('Y-m-d H:i:s');
     
     // Daten in die Datenbank einfügen
-    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer, turnier_id) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$anmeldedatum, $name, $email, $mobilnummer ?: null, $turnierId ?: null]);
+    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer, \"alter\", name_auf_wertungsliste, turnier_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$anmeldedatum, $name, $email, $mobilnummer ?: null, $alter, $nameAufWertungsliste, $turnierId ?: null]);
     
     // ID der eingefügten Anmeldung holen
     $anmeldungId = $db->lastInsertId();
@@ -191,7 +193,7 @@ try {
     
 } catch (PDOException $e) {
     // Bei Fehler weiterleiten
-    $redirectParams = 'error=database&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer);
+    $redirectParams = 'error=database&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -199,7 +201,7 @@ try {
     exit;
 } catch (Exception $e) {
     // Bei anderen Fehlern weiterleiten
-    $redirectParams = 'error=database&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer);
+    $redirectParams = 'error=database&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }

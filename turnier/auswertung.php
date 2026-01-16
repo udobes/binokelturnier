@@ -377,7 +377,7 @@ if ($aktuellesTurnier) {
                         <?php foreach ($ergebnisseMitRunden as $ergebnis): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($ergebnis['startnummer']); ?></td>
-                                <td><?php echo htmlspecialchars($ergebnis['name']); ?></td>
+                                <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                 <?php for ($i = 1; $i <= $anzahlRunden; $i++): ?>
                                     <td><?php echo isset($ergebnis['runde' . $i . '_punkte']) && $ergebnis['runde' . $i . '_punkte'] !== null ? htmlspecialchars($ergebnis['runde' . $i . '_punkte']) : '-'; ?></td>
                                 <?php endfor; ?>

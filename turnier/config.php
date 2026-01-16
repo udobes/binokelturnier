@@ -390,8 +390,8 @@ function getErgebnisseFuerSpieler($turnierId, $spieler) {
 function getErgebnisseFuerTurnier($turnierId, $anzahlRunden) {
     $db = getDB();
     
-    // Basis-Daten aus turnier_registrierungen (mit JOIN zu anmeldungen für Name)
-    $stmt = $db->prepare("SELECT tr.startnummer, a.name, tr.gesamtpunkte 
+    // Basis-Daten aus turnier_registrierungen (mit JOIN zu anmeldungen für Name und name_auf_wertungsliste)
+    $stmt = $db->prepare("SELECT tr.startnummer, a.name, a.name_auf_wertungsliste, tr.gesamtpunkte 
         FROM turnier_registrierungen tr 
         LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id 
         WHERE tr.turnier_id = ? 
@@ -506,7 +506,7 @@ function registriereDurchNummer($turnierId, $registrierNummer) {
 }
 
 // Registrierung über Registriernummer mit angepassten Daten erstellen
-function registriereDurchNummerMitDaten($turnierId, $registrierNummer, $name, $email = null, $mobilnummer = null) {
+function registriereDurchNummerMitDaten($turnierId, $registrierNummer, $name, $email = null, $mobilnummer = null, $alter = null, $nameAufWertungsliste = 0) {
     $db = getDB();
     
     // Prüfen ob Anmeldung existiert
@@ -516,29 +516,33 @@ function registriereDurchNummerMitDaten($turnierId, $registrierNummer, $name, $e
         return ['success' => false, 'error' => 'Registriernummer nicht gefunden.'];
     }
     
+    // Daten in anmeldungen aktualisieren (immer, auch wenn bereits registriert)
+    $stmt = $db->prepare("UPDATE anmeldungen SET name = ?, email = ?, mobilnummer = ?, \"alter\" = ?, name_auf_wertungsliste = ? WHERE id = ?");
+    $stmt->execute([$name, $email, $mobilnummer, $alter, $nameAufWertungsliste, $registrierNummer]);
+    
     // Prüfen ob bereits registriert
-    $stmt = $db->prepare("SELECT id FROM turnier_registrierungen WHERE turnier_id = ? AND anmeldung_id = ?");
+    $stmt = $db->prepare("SELECT id, startnummer FROM turnier_registrierungen WHERE turnier_id = ? AND anmeldung_id = ?");
     $stmt->execute([$turnierId, $registrierNummer]);
-    if ($stmt->fetch()) {
-        return ['success' => false, 'error' => 'Diese Person ist bereits für dieses Turnier registriert.'];
+    $existingRegistration = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($existingRegistration) {
+        // Bereits registriert - verwende bestehende Startnummer
+        $startnummer = $existingRegistration['startnummer'];
+        return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'updated' => true];
+    } else {
+        // Noch nicht registriert - neue Startnummer vergeben und registrieren
+        $startnummer = getNextStartnummer($turnierId);
+        
+        // Registrierung speichern
+        $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
+        $stmt->execute([$turnierId, $registrierNummer, $startnummer]);
+        
+        return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'updated' => false];
     }
-    
-    // Startnummer vergeben
-    $startnummer = getNextStartnummer($turnierId);
-    
-    // Daten in anmeldungen aktualisieren, falls sie geändert wurden
-    $stmt = $db->prepare("UPDATE anmeldungen SET name = ?, email = ?, mobilnummer = ? WHERE id = ?");
-    $stmt->execute([$name, $email, $mobilnummer, $registrierNummer]);
-    
-    // Registrierung speichern (nur anmeldung_id, Name, Email und Mobilnummer kommen aus anmeldungen)
-    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
-    $stmt->execute([$turnierId, $registrierNummer, $startnummer]);
-    
-    return ['success' => true, 'startnummer' => $startnummer, 'name' => $name];
 }
 
 // Neue Person registrieren
-function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = null) {
+function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = null, $alter = null, $nameAufWertungsliste = 0) {
     $db = getDB();
     
     if (empty($name)) {
@@ -556,8 +560,8 @@ function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = 
     $emailFuerAnmeldung = !empty($email) ? $email : 'keine-email-' . time() . '@turnier.local';
     
     $anmeldedatum = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$anmeldedatum, $name, $emailFuerAnmeldung, $mobilnummer]);
+    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer, \"alter\", name_auf_wertungsliste) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$anmeldedatum, $name, $emailFuerAnmeldung, $mobilnummer, $alter, $nameAufWertungsliste]);
     $anmeldungId = $db->lastInsertId();
     
     // Falls lastInsertId() fehlschlägt, ID aus DB holen
@@ -593,7 +597,9 @@ function getTurnierRegistrierungen($turnierId) {
             tr.gesamtpunkte,
             a.name,
             a.email,
-            a.mobilnummer
+            a.mobilnummer,
+            a.\"alter\",
+            a.name_auf_wertungsliste
         FROM turnier_registrierungen tr
         LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
         WHERE tr.turnier_id = ? 

@@ -197,6 +197,8 @@ if ($turnier && !empty($turnier['datum'])) {
             $prevName = isset($_GET['name']) ? htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8') : '';
             $prevEmail = isset($_GET['email']) ? htmlspecialchars($_GET['email'], ENT_QUOTES, 'UTF-8') : '';
             $prevMobilnummer = isset($_GET['mobilnummer']) ? htmlspecialchars($_GET['mobilnummer'], ENT_QUOTES, 'UTF-8') : '';
+            $prevAlter = isset($_GET['alter']) ? htmlspecialchars($_GET['alter'], ENT_QUOTES, 'UTF-8') : '';
+            $prevNameAufWertungsliste = isset($_GET['name_auf_wertungsliste']) ? htmlspecialchars($_GET['name_auf_wertungsliste'], ENT_QUOTES, 'UTF-8') : '';
             ?>
             <form action="process.php" method="POST">
                 <input type="hidden" name="turnier_id" value="<?php echo $turnierId ? $turnierId : ''; ?>">
@@ -214,6 +216,18 @@ if ($turnier && !empty($turnier['datum'])) {
                 <div class="form-group">
                     <label for="mobilnummer">Mobilfunknummer (optional)</label>
                     <input type="tel" id="mobilnummer" name="mobilnummer" value="<?php echo $prevMobilnummer; ?>" placeholder="z.B. 0171 12345678">
+                </div>
+
+                <div class="form-group">
+                    <label for="alter">Alter</label>
+                    <input type="text" id="alter" name="alter" value="<?php echo $prevAlter; ?>" placeholder="z.B. 35">
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="name_auf_wertungsliste" name="name_auf_wertungsliste" value="1" <?php echo ($prevNameAufWertungsliste === '0') ? '' : 'checked'; ?>>
+                        <span>Mein Name darf auf den Wertungslisten genannt werden</span>
+                    </label>
                 </div>
 
                 <div class="form-group checkbox-group">
