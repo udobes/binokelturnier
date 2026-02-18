@@ -1,0 +1,42 @@
+starte ein php projekt für eine anmeldung zu einem binokelturnier
+die anmeldung soll im pfad anmeldung umgesetzt werden
+die daten sollen mit eine SQLlite verwaltet werden und im Verzeichnis daten gespeichert werden
+am beispiel der anmeldung von https://docs.google.com/forms/d/e/1FAIpQLSfTfQVI1BhB7r_yplE95teFq_FdgTIAj_3FDWjwjEfYjCdaLw/viewform soll ein formular erzeugt werden
+Überschrift: 2. Binokelturnier Heroldstatt
+darunter: 09.5.2026 in der Berghalle, beginn 18 Uhr (Einlass 17 Uhr)
+Eingabefelder sollen sein:
+Name in Klartext
+E-Mail-Adresse
+Die Daten sollen in die Datenbank geschrieben werden. Die erste Spalte der Datenbank soll eine eindeutige ID sein, die zweite Spalte das Datum und Uhrzeit der Anmeldung, dann Name und Email
+
+Wenn eine Falscheingabe gemacht wurde sollen die eingegebenen Daten als vorlage in den Feldern gesetzt werden
+
+Nach erfolgreicher Eingabe soll im Fenster die Meldung erscheinen:
+Vielen Dank für die Anmeldung.
+Es wird ein Mail an (Mailadresse einfügen) mit der Bestätigung der Anmeldung und weiteren Informationen gesendet.
+Das Bestötiguns-Mail ist zu generieren und zu versenden, an udo.besenreuther@aks-heroldstatt.de
+
+Bei der Erfolgsmeldung soll nur die Meldung  angezeigt werden, ohne das Eingabeformular
+
+Es sollen 2 Mails geschickt werden eine Info an den Administrator udo.besenreuther@aks-heroldstatt.de
+und ein Mail an den Nutzer, an die Mailadresse aus dem Formular
+
+Die texte der Mails sollen in Variablen in der config.php definiert werden
+
+das Mail an den Anmelder kommt nicht an, die Erfolgsmeldung anstelle des Formulas erscheint nicht, bitte fehler prüfen
+
+die Bestätigungsmail an die eingegebene Mailadresse kommt nicht an - bitte korrigieren
+
+die mail kommt bai udo.besenruther@sit-heroldstatt.de an. sie komt nicht bei udo.besenruther@gmai.com und udo.besenruther@lai.de an
+
+kann man eine lesebestätigung einbauen, die zurückmeldet, ob die mail angekommen ist?
+die bestätigung soll mit datum und zeit in der DB gespeichert werden
+
+gitb es eine mögichkeit die Daten der SQLlight zu bearbeiten, bitte im verzeichnis daten installieren
+
+füge pro zeile einen button ein 'Mail erneut senden' und am  Ende einen button ein 'Export in Excel', damit wird ein Download in Excelformat gestartet
+
+verwende die grafik Binokel_Hintergrund.png als hintergrund auf der hauptseite, skaliere sie auf vollbild unter beibehaltung des seitenverhältnisses
+
+füge die id nummer als Registriernummer auf der Bestätigung für Teilnehmer und admin dazu. In der bestätigungsmail ür den teilnehmer soll eine ergänzung aufgenommen werden: Für eine schnelle anmeldung am Spielabend, halten Sie bitte Ihre Registriernummer bereit.
+Die Registriernummer soll auch auf dem Bestätigungsbildschirm nach Mailversand angezeigt werden

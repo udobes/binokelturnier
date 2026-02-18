@@ -82,8 +82,13 @@ function initDB() {
 define('ADMIN_EMAIL', 'udo.besenreuther@aks-heroldstatt.de');
 // FROM_EMAIL sollte eine gültige E-Mail-Adresse sein, die auf dem Server existiert
 // Falls noreply nicht funktioniert, verwende die Admin-E-Mail
-define('FROM_EMAIL', 'udo.besenreuther@aks-heroldstatt.de');
+define('FROM_EMAIL', 'binokel@aks-heroldstatt.de');
 define('FROM_NAME', 'Binokelturnier Heroldstatt');
+
+// Soll die Spielregeln als Anhang mit der Bestätigungsmail verschickt werden?
+// true  = Spielregeln werden als PDF/ODT-Anhang mitgeschickt (falls Datei vorhanden)
+// false = keine Spielregeln im Anhang
+$SEND_SPIELREGELN_ATTACHMENT = false;
 
 // E-Mail-Texte
 // Betreffzeilen
@@ -117,6 +122,7 @@ $EMAIL_TEMPLATE_CONFIRMATION = "
             Einlass: {EINLASSZEIT}</p>
         </div>
         <p><strong>Für eine schnelle Anmeldung am Spielabend, halten Sie bitte Ihre Registriernummer bereit.</strong></p>
+        <p>Bitte bringen Sie zur Veranstaltung ein Smartphone mit. Wir werden Spielparungen und Spielergebnisse individuell auf das Smartphone übertragen.</p>
         <p>Weitere Informationen erhalten Sie in Kürze.</p>
         <p>Mit freundlichen Grüßen<br>
         Das Organisationsteam</p>
@@ -147,6 +153,8 @@ Beginn: {STARTZEIT}
 Einlass: {EINLASSZEIT}
 
 Für eine schnelle Anmeldung am Spielabend, halten Sie bitte Ihre Registriernummer bereit.
+
+Bitte bringen Sie zur Veranstaltung ein Smartphone mit. Wir werden Tischeinteilung und Spielergebnisse individuell auf das Smartphone übertragen.
 
 Weitere Informationen erhalten Sie in Kürze.
 
@@ -414,7 +422,7 @@ function generateTrackingCode($id) {
 
 // Bestätigungsmail an Teilnehmer senden
 function sendConfirmationEmail($name, $email, $anmeldungId = null, $turnier = null) {
-    global $EMAIL_SUBJECT_CONFIRMATION, $EMAIL_TEMPLATE_CONFIRMATION, $EMAIL_TEMPLATE_CONFIRMATION_TEXT;
+    global $EMAIL_SUBJECT_CONFIRMATION, $EMAIL_TEMPLATE_CONFIRMATION, $EMAIL_TEMPLATE_CONFIRMATION_TEXT, $SEND_SPIELREGELN_ATTACHMENT;
     
     // Validierung der Parameter
     if (empty($name) || empty($email)) {
@@ -491,41 +499,46 @@ function sendConfirmationEmail($name, $email, $anmeldungId = null, $turnier = nu
     
     $htmlMessage = str_replace('{TRACKING_PIXEL}', $trackingPixel, $htmlMessage);
     
-    // Anhang hinzufügen (Spielregeln)
-    // Versuche verschiedene mögliche Dateinamen
-    $possiblePaths = [
-        __DIR__ . '/Binokel-Tunier_Spielregeln_AKS-Heroldstatt.pdf',
-        __DIR__ . '/Binokel-Tunier_Spielregeln_AKS-Herodstatt.pdf',
-        __DIR__ . '/Binokel-Tunier_Spielregeln_AKS-Heroldstatt.odt'
-    ];
-    
-    $attachmentPath = null;
-    foreach ($possiblePaths as $path) {
-        if (file_exists($path)) {
-            $attachmentPath = $path;
-            break;
-        }
-    }
-    
+    // Anhang hinzufügen (Spielregeln), nur wenn in der Konfiguration aktiviert
     $attachment = null;
-    if ($attachmentPath !== null) {
-        $fileName = basename($attachmentPath);
-        $fileExtension = strtolower(pathinfo($attachmentPath, PATHINFO_EXTENSION));
-        $mimeTypes = [
-            'pdf' => 'application/pdf',
-            'odt' => 'application/vnd.oasis.opendocument.text'
-        ];
-        $mimeType = $mimeTypes[$fileExtension] ?? 'application/octet-stream';
-        
-        $attachment = [
-            'path' => $attachmentPath,
-            'name' => $fileName,
-            'mime' => $mimeType
+    if (!empty($SEND_SPIELREGELN_ATTACHMENT)) {
+        // Versuche verschiedene mögliche Dateinamen
+        $possiblePaths = [
+            __DIR__ . '/Binokel-Tunier_Spielregeln_AKS-Heroldstatt.pdf',
+            __DIR__ . '/Binokel-Tunier_Spielregeln_AKS-Herodstatt.pdf',
+            __DIR__ . '/Binokel-Tunier_Spielregeln_AKS-Heroldstatt.odt'
         ];
         
-        error_log("Anhang gefunden: " . $attachmentPath . " (Größe: " . filesize($attachmentPath) . " Bytes)");
+        $attachmentPath = null;
+        foreach ($possiblePaths as $path) {
+            if (file_exists($path)) {
+                $attachmentPath = $path;
+                break;
+            }
+        }
+        
+        if ($attachmentPath !== null) {
+            $fileName = basename($attachmentPath);
+            $fileExtension = strtolower(pathinfo($attachmentPath, PATHINFO_EXTENSION));
+            $mimeTypes = [
+                'pdf' => 'application/pdf',
+                'odt' => 'application/vnd.oasis.opendocument.text'
+            ];
+            $mimeType = $mimeTypes[$fileExtension] ?? 'application/octet-stream';
+            
+            $attachment = [
+                'path' => $attachmentPath,
+                'name' => $fileName,
+                'mime' => $mimeType
+            ];
+            
+            error_log("Anhang gefunden: " . $attachmentPath . " (Größe: " . filesize($attachmentPath) . " Bytes)");
+        } else {
+            error_log("WARNUNG: Anhang-Datei nicht gefunden. Gesuchte Pfade: " . implode(', ', $possiblePaths));
+        }
     } else {
-        error_log("WARNUNG: Anhang-Datei nicht gefunden. Gesuchte Pfade: " . implode(', ', $possiblePaths));
+        // Anhang explizit deaktiviert
+        $attachment = null;
     }
     
     // E-Mail versenden (mit HTML und Text-Version und Anhang)

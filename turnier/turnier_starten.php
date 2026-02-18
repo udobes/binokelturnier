@@ -660,38 +660,7 @@ if ($aktuellesTurnier) {
                             </div>
                         </div>
                         <div class="runde-content" id="content-<?php echo $runde; ?>">
-                        <table style="margin-bottom: 30px;">
-                        <thead>
-                            <tr>
-                                <th style="width: 20%;">Tisch</th>
-                                <th>Teilnehmer</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($tische)): ?>
-                                <tr>
-                                    <td colspan="2" style="text-align: center; color: #999;">Keine Zuordnungen für diese Runde</td>
-                                </tr>
-                            <?php else: ?>
-                                <?php foreach ($tische as $tisch => $spieler): ?>
-                                    <tr>
-                                        <td><strong>Tisch <?php echo htmlspecialchars($tisch); ?></strong></td>
-                                        <td>
-                                            <?php 
-                                            $spielerNummern = [];
-                                            foreach ($spieler as $spielerId) {
-                                                $spielerNummern[] = htmlspecialchars($spielerId);
-                                            }
-                                            echo 'Teilnehmer ' . implode(',', $spielerNummern);
-                                            ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                    
-                    <!-- Alternative Darstellung: Personenzuordnung wie in personzuordnung2.php -->
+                    <!-- Personenzuordnung wie in personzuordnung2.php -->
                     <div id="personenzuordnung-<?php echo $runde; ?>" style="margin-bottom: 30px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <h3 style="margin: 0; color: #667eea; font-size: 16pt;">Personenzuordnung Runde <?php echo $runde; ?></h3>

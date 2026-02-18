@@ -63,7 +63,7 @@ initTurnierDB();
             <a href="turnier_starten.php" target="content">2. Turnier starten</a>
         </li>
         <li class="menu-item">
-            <a href="../anmeldung/verwaltung.php" target="content">3. Anmeldung</a>
+            <a href="verwaltung.php" target="content">3. Anmeldung</a>
         </li>
         <li class="menu-item">
             <a href="registrierung.php" target="content">4. Registrierung</a>
@@ -73,6 +73,9 @@ initTurnierDB();
         </li>
         <li class="menu-item">
             <a href="auswertung.php" target="content">6. Auswertung</a>
+        </li>
+        <li class="menu-item">
+            <a href="smartphone.php" target="content">7. Smartphone</a>
         </li>
     </ul>
     <script>

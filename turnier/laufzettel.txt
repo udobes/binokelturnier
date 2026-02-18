@@ -13,29 +13,17 @@ Spieler Nr:
 
 Runde 1:
 
-Pluspunkte:  _______________
-
-Minuspunkte: _______________
-
-Summe Runde1: ______________
+Summe Runde 1: ______________
 
 
 Runde 2:
 
-Pluspunkte:  _______________
-
-Minuspunkte: _______________
-
-Summe Runde1: ______________
+Summe Runde 2: ______________
 
 
 Runde 3:
 
-Pluspunkte:  _______________
-
-Minuspunkte: _______________
-
-Summe Runde1: ______________
+Summe Runde 3: ______________
 
 
 

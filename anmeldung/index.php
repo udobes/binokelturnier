@@ -4,8 +4,14 @@ require_once __DIR__ . '/../turnier/config.php';
 initDB();
 initTurnierDB();
 
-// Turnier-ID aus URL-Parameter holen
-$turnierId = isset($_GET['turnier']) ? intval($_GET['turnier']) : null;
+// Turnier-ID aus URL-Parameter holen (akzeptiere sowohl "turnier" als auch "tunier")
+$turnierId = null;
+if (isset($_GET['turnier'])) {
+    $turnierId = intval($_GET['turnier']);
+} elseif (isset($_GET['tunier'])) {
+    // Toleranz für Tippfehler "tunier" statt "turnier"
+    $turnierId = intval($_GET['tunier']);
+}
 $turnier = null;
 
 if ($turnierId) {
@@ -31,6 +37,7 @@ if (!$turnier) {
 // Falls immer noch kein Turnier, versuche aktives Turnier zu holen
 if (!$turnier) {
     $turnier = getAktuellesTurnier();
+    
     if ($turnier) {
         $turnierId = $turnier['id'];
     }

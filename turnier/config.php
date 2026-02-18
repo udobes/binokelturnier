@@ -74,7 +74,7 @@ function initTurnierDB() {
     )");
     
     // Tabelle für Tischzuordnungen erstellen
-    // spieler_id ist jetzt eine Teilnehmernummer (1, 2, 3, ...) und kein Foreign Key mehr
+    // spieler_id ist jetzt eine Teilnehmernummer (1, 2, 3, ...) und KEIN Foreign Key mehr
     $db->exec("CREATE TABLE IF NOT EXISTS turnier_zuordnungen (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         turnier_id INTEGER NOT NULL,
@@ -83,6 +83,50 @@ function initTurnierDB() {
         spieler_id INTEGER NOT NULL,
         FOREIGN KEY (turnier_id) REFERENCES turnier(id)
     )");
+
+    // Migration: Ältere Versionen könnten noch einen Foreign Key auf spieler_id haben,
+    // der auf turnier_spieler.id zeigt. Da spieler_id jetzt nur eine einfache
+    // Teilnehmernummer ist, entfernen wir diesen FK durch Neuaufbau der Tabelle.
+    try {
+        $stmt = $db->query("PRAGMA foreign_key_list(turnier_zuordnungen)");
+        $fks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $hasSpielerFk = false;
+        foreach ($fks as $fk) {
+            if (isset($fk['from']) && $fk['from'] === 'spieler_id') {
+                $hasSpielerFk = true;
+                break;
+            }
+        }
+
+        if ($hasSpielerFk) {
+            // Foreign Keys temporär deaktivieren, um die Tabelle umbauen zu können
+            $db->exec("PRAGMA foreign_keys = OFF");
+
+            // Neue Tabelle ohne FK auf spieler_id anlegen
+            $db->exec("CREATE TABLE IF NOT EXISTS turnier_zuordnungen_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                turnier_id INTEGER NOT NULL,
+                runde INTEGER NOT NULL,
+                tisch INTEGER NOT NULL,
+                spieler_id INTEGER NOT NULL,
+                FOREIGN KEY (turnier_id) REFERENCES turnier(id)
+            )");
+
+            // Daten übernehmen (nur die relevanten Spalten)
+            $db->exec("INSERT INTO turnier_zuordnungen_new (id, turnier_id, runde, tisch, spieler_id)
+                       SELECT id, turnier_id, runde, tisch, spieler_id FROM turnier_zuordnungen");
+
+            // Alte Tabelle ersetzen
+            $db->exec("DROP TABLE turnier_zuordnungen");
+            $db->exec("ALTER TABLE turnier_zuordnungen_new RENAME TO turnier_zuordnungen");
+
+            // Foreign Keys wieder aktivieren
+            $db->exec("PRAGMA foreign_keys = ON");
+        }
+    } catch (PDOException $e) {
+        // Falls etwas schiefgeht, Migration überspringen, damit das System weiterläuft
+        error_log("Migration Fehler für turnier_zuordnungen (kann meist ignoriert werden): " . $e->getMessage());
+    }
     
     // Tabelle für Turnier-Registrierungen erstellen (OHNE name, email, mobilnummer - kommen aus anmeldungen)
     $db->exec("CREATE TABLE IF NOT EXISTS turnier_registrierungen (

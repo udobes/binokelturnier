@@ -981,9 +981,7 @@ for ($runde = 1; $runde <= $anzahlRunden; $runde++) {
     $laufzettelHTML .= '<div class="laufzettel-runde">';
     $laufzettelHTML .= '<h2 class="runde-title">Runde ' . $runde . ':</h2>';
     $laufzettelHTML .= '<table class="runde-table">';
-    $laufzettelHTML .= '<tr><td class="runde-label">Pluspunkte:</td><td class="runde-field"></td></tr>';
-    $laufzettelHTML .= '<tr><td class="runde-label">Minuspunkte:</td><td class="runde-field"></td></tr>';
-    $laufzettelHTML .= '<tr><td class="runde-label">Summe Runde' . $runde . ':</td><td class="runde-field"></td></tr>';
+    $laufzettelHTML .= '<tr><td class="runde-label">Summe Runde ' . $runde . ':</td><td class="runde-field"></td></tr>';
     $laufzettelHTML .= '</table>';
     $laufzettelHTML .= '</div>';
 }

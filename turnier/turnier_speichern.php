@@ -45,9 +45,21 @@ try {
     $db = getDB();
     
     if ($id > 0) {
+        // Bestehendes Turnier laden, um alte Spieleranzahl zu vergleichen
+        $stmt = $db->prepare("SELECT anzahl_spieler FROM turnier WHERE id = ?");
+        $stmt->execute([$id]);
+        $altesTurnier = $stmt->fetch(PDO::FETCH_ASSOC);
+        $alteAnzahlSpieler = $altesTurnier ? intval($altesTurnier['anzahl_spieler']) : null;
+
         // Turnier aktualisieren
         $stmt = $db->prepare("UPDATE turnier SET datum = ?, titel = ?, veranstalter = ?, ort = ?, einlasszeit = ?, startzeit = ?, googlemaps_link = ?, anzahl_spieler = ?, anzahl_runden = ?, spieler_pro_runde = ? WHERE id = ?");
         $stmt->execute([$datum, $titel, $veranstalter, $ort, $einlasszeit ?: null, $startzeit ?: null, $googlemaps_link ?: null, $anzahl_spieler, $anzahl_runden, $spieler_pro_runde, $id]);
+        
+        // Wenn sich die Anzahl der Spieler geändert hat, Tischzuordnungen für dieses Turnier löschen
+        if ($alteAnzahlSpieler !== null && $alteAnzahlSpieler !== $anzahl_spieler) {
+            $stmt = $db->prepare("DELETE FROM turnier_zuordnungen WHERE turnier_id = ?");
+            $stmt->execute([$id]);
+        }
         
         header('Location: turnier_erfassen.php?success=1');
     } else {
