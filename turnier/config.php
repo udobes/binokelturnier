@@ -170,6 +170,20 @@ function initTurnierDB() {
         // Spalte existiert bereits, ignorieren
     }
     
+    // PIN-Spalte hinzufügen (falls noch nicht vorhanden)
+    try {
+        $db->exec("ALTER TABLE turnier_registrierungen ADD COLUMN pin TEXT DEFAULT NULL");
+    } catch (PDOException $e) {
+        // Spalte existiert bereits, ignorieren
+    }
+    
+    // Gesperrt-Spalte hinzufügen (falls noch nicht vorhanden)
+    try {
+        $db->exec("ALTER TABLE turnier_registrierungen ADD COLUMN gesperrt INTEGER DEFAULT 0");
+    } catch (PDOException $e) {
+        // Spalte existiert bereits, ignorieren
+    }
+    
     // Migration: Überflüssige Spalten entfernen (rundeX_punkte, rundeX_eingetragen_am, name, email, mobilnummer)
     // SQLite unterstützt DROP COLUMN erst ab Version 3.35.0, daher Migration durchführen
     try {
@@ -542,11 +556,14 @@ function registriereDurchNummer($turnierId, $registrierNummer) {
     // Startnummer vergeben
     $startnummer = getNextStartnummer($turnierId);
     
-    // Registrierung speichern (nur anmeldung_id, Name und Email kommen aus anmeldungen)
-    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
-    $stmt->execute([$turnierId, $registrierNummer, $startnummer]);
+    // PIN generieren (4-stellig)
+    $pin = str_pad(strval(rand(1000, 9999)), 4, '0', STR_PAD_LEFT);
     
-    return ['success' => true, 'startnummer' => $startnummer, 'name' => $anmeldung['name']];
+    // Registrierung speichern (nur anmeldung_id, Name und Email kommen aus anmeldungen)
+    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer, pin) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$turnierId, $registrierNummer, $startnummer, $pin]);
+    
+    return ['success' => true, 'startnummer' => $startnummer, 'name' => $anmeldung['name'], 'pin' => $pin];
 }
 
 // Registrierung über Registriernummer mit angepassten Daten erstellen
@@ -577,11 +594,14 @@ function registriereDurchNummerMitDaten($turnierId, $registrierNummer, $name, $e
         // Noch nicht registriert - neue Startnummer vergeben und registrieren
         $startnummer = getNextStartnummer($turnierId);
         
-        // Registrierung speichern
-        $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
-        $stmt->execute([$turnierId, $registrierNummer, $startnummer]);
+        // PIN generieren (4-stellig)
+        $pin = str_pad(strval(rand(1000, 9999)), 4, '0', STR_PAD_LEFT);
         
-        return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'updated' => false];
+        // Registrierung speichern
+        $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer, pin) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$turnierId, $registrierNummer, $startnummer, $pin]);
+        
+        return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'updated' => false, 'pin' => $pin];
     }
 }
 
@@ -621,11 +641,14 @@ function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = 
     // Startnummer vergeben
     $startnummer = getNextStartnummer($turnierId);
     
-    // Registrierung speichern (nur anmeldung_id, Name, Email und Mobilnummer kommen aus anmeldungen)
-    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer) VALUES (?, ?, ?)");
-    $stmt->execute([$turnierId, $anmeldungId, $startnummer]);
+    // PIN generieren (4-stellig)
+    $pin = str_pad(strval(rand(1000, 9999)), 4, '0', STR_PAD_LEFT);
     
-    return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'anmeldung_id' => $anmeldungId];
+    // Registrierung speichern (nur anmeldung_id, Name, Email und Mobilnummer kommen aus anmeldungen)
+    $stmt = $db->prepare("INSERT INTO turnier_registrierungen (turnier_id, anmeldung_id, startnummer, pin) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$turnierId, $anmeldungId, $startnummer, $pin]);
+    
+    return ['success' => true, 'startnummer' => $startnummer, 'name' => $name, 'anmeldung_id' => $anmeldungId, 'pin' => $pin];
 }
 
 // Alle Registrierungen für ein Turnier holen (mit JOIN zu anmeldungen für Name, Email, Mobilnummer)

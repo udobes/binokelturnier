@@ -123,6 +123,22 @@ $hatStartnummer = isset($_SESSION['startnummer']) && $_SESSION['startnummer'] !=
 // Startnummer der aktuellen Person (unabhängig von Tisch-/Rundenzuordnung)
 $startnummerAktuell = $hatStartnummer ? intval($_SESSION['startnummer']) : null;
 
+// Name des Spielers für die aktuelle Startnummer laden
+$spielerName = null;
+if ($startnummerAktuell !== null) {
+    $stmt = $db->prepare("
+        SELECT a.name 
+        FROM turnier_registrierungen tr
+        LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
+        WHERE tr.turnier_id = ? AND tr.startnummer = ?
+    ");
+    $stmt->execute([$aktuellesTurnier['id'], $startnummerAktuell]);
+    $spielerDaten = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($spielerDaten && isset($spielerDaten['name'])) {
+        $spielerName = $spielerDaten['name'];
+    }
+}
+
 // Ergebnis-Infos für die aktuelle Startnummer
 $spielerPunkte = null;
 $spielerPlatz = null;
@@ -180,14 +196,14 @@ if ($aktiveErgebnisRunde !== null) {
             }
         }
 
-        // Zurück nach Gesamtpunkten sortieren
+        // Nach Platz sortieren, dann nach Startnummer
         usort($ergebnisseMitRunden, function($a, $b) {
-            $punkteA = $a['gesamtpunkte'] !== null ? intval($a['gesamtpunkte']) : -1;
-            $punkteB = $b['gesamtpunkte'] !== null ? intval($b['gesamtpunkte']) : -1;
-            if ($punkteA === $punkteB) {
+            $platzA = isset($a['platzierung']) && $a['platzierung'] !== null ? intval($a['platzierung']) : 999999;
+            $platzB = isset($b['platzierung']) && $b['platzierung'] !== null ? intval($b['platzierung']) : 999999;
+            if ($platzA === $platzB) {
                 return $a['startnummer'] - $b['startnummer'];
             }
-            return ($punkteB - $punkteA); // DESC
+            return $platzA - $platzB; // ASC (Platz 1 vor Platz 2)
         });
     } else {
         // Ergebnisse für eine spezifische Runde
@@ -241,18 +257,23 @@ if ($aktiveErgebnisRunde !== null) {
             }
         }
         
-        // Nach Startnummer sortieren für Anzeige
-        usort($alleErgebnisse, function($a, $b) {
-            return $a['startnummer'] - $b['startnummer'];
-        });
-        
-        $rundenErgebnisse = $alleErgebnisse;
-        
         // Platzierungen zuweisen
-        foreach ($rundenErgebnisse as &$ergebnis) {
+        foreach ($alleErgebnisse as &$ergebnis) {
             $ergebnis['platzierung'] = $platzierungen[$ergebnis['startnummer']] ?? null;
         }
         unset($ergebnis);
+        
+        // Nach Platz sortieren, dann nach Startnummer
+        usort($alleErgebnisse, function($a, $b) {
+            $platzA = isset($a['platzierung']) && $a['platzierung'] !== null ? intval($a['platzierung']) : 999999;
+            $platzB = isset($b['platzierung']) && $b['platzierung'] !== null ? intval($b['platzierung']) : 999999;
+            if ($platzA === $platzB) {
+                return $a['startnummer'] - $b['startnummer'];
+            }
+            return $platzA - $platzB; // ASC (Platz 1 vor Platz 2)
+        });
+        
+        $rundenErgebnisse = $alleErgebnisse;
 
         // Ergebnis für aktuelle Startnummer (Einzelrunde) ermitteln
         if ($startnummerAktuell !== null) {
@@ -436,6 +457,114 @@ if ($aktiveErgebnisRunde !== null) {
         .startnummer-hervorgehoben:hover {
             background: #f8f8f8;
         }
+        .meine-punkte-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .meine-punkte-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        a.meine-punkte-btn {
+            text-decoration: none;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .overlay.active {
+            display: flex;
+        }
+        .overlay-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .overlay-content h2 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .overlay-content .form-group {
+            margin-bottom: 20px;
+        }
+        .overlay-content label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .overlay-content input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .overlay-content input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .overlay-content .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .overlay-content button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .overlay-content .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .overlay-content .btn-primary:hover {
+            background: #5568d3;
+        }
+        .overlay-content .btn-secondary {
+            background: #ccc;
+            color: #333;
+        }
+        .overlay-content .btn-secondary:hover {
+            background: #bbb;
+        }
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            display: none;
+        }
+        .highlighted-cell {
+            background-color: #ffeb3b !important;
+        }
+        .highlighted-row {
+            background-color: #ffeb3b !important;
+        }
+        .highlighted-row:hover {
+            background-color: #ffd54f !important;
+        }
     </style>
     <script>
         var currentSortColumn = {};
@@ -539,6 +668,140 @@ if ($aktiveErgebnisRunde !== null) {
                     }
                 });
             }
+
+            // Sekundenzähler starten
+            var sekundenzaehler = document.getElementById('sekundenzaehler');
+            if (sekundenzaehler) {
+                var sekunden = 0;
+                setInterval(function() {
+                    sekunden++;
+                    sekundenzaehler.textContent = sekunden + ' Sekunden';
+                }, 1000);
+            }
+        });
+
+        function openPunkteEingabe() {
+            var startnummer = <?php echo $startnummerAktuell !== null ? $startnummerAktuell : 'null'; ?>;
+            var aktiveRunde = <?php echo $aktiveRunde !== null ? $aktiveRunde : 'null'; ?>;
+            
+            // Punkte laden
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '../turnier/punkte_laden.php?startnummer=' + startnummer + '&runde=' + aktiveRunde, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            if (response.success) {
+                                var punkteInput = document.getElementById('punkte-input');
+                                var pinGroup = document.getElementById('pin-group');
+                                var speichernBtn = document.getElementById('speichern-btn');
+                                
+                                if (response.vorhanden && response.punkte !== null) {
+                                    // Punkte bereits vorhanden: Feld readonly, PIN ausblenden, Speichern ausblenden
+                                    punkteInput.value = response.punkte;
+                                    punkteInput.readOnly = true;
+                                    punkteInput.style.backgroundColor = '#f0f0f0';
+                                    if (pinGroup) pinGroup.style.display = 'none';
+                                    if (speichernBtn) speichernBtn.style.display = 'none';
+                                } else {
+                                    // Keine Punkte: Normale Eingabe
+                                    punkteInput.value = '';
+                                    punkteInput.readOnly = false;
+                                    punkteInput.style.backgroundColor = '';
+                                    if (pinGroup) pinGroup.style.display = 'block';
+                                    if (speichernBtn) speichernBtn.style.display = 'block';
+                                }
+                                
+                                document.getElementById('punkte-overlay').classList.add('active');
+                                if (!punkteInput.readOnly) {
+                                    punkteInput.focus();
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Fehler beim Laden der Punkte:', e);
+                            // Bei Fehler trotzdem Overlay öffnen
+                            document.getElementById('punkte-overlay').classList.add('active');
+                            document.getElementById('punkte-input').focus();
+                        }
+                    } else {
+                        // Bei Fehler trotzdem Overlay öffnen
+                        document.getElementById('punkte-overlay').classList.add('active');
+                        document.getElementById('punkte-input').focus();
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function closePunkteEingabe() {
+            document.getElementById('punkte-overlay').classList.remove('active');
+            document.getElementById('punkte-form').reset();
+            document.getElementById('error-message').style.display = 'none';
+            
+            // Felder zurücksetzen
+            var punkteInput = document.getElementById('punkte-input');
+            var pinGroup = document.getElementById('pin-group');
+            var speichernBtn = document.getElementById('speichern-btn');
+            
+            punkteInput.readOnly = false;
+            punkteInput.style.backgroundColor = '';
+            if (pinGroup) pinGroup.style.display = 'block';
+            if (speichernBtn) speichernBtn.style.display = 'block';
+        }
+
+        function speicherePunkte() {
+            var startnummer = <?php echo $startnummerAktuell !== null ? $startnummerAktuell : 'null'; ?>;
+            var aktiveRunde = <?php echo $aktiveRunde !== null ? $aktiveRunde : 'null'; ?>;
+            var punkte = document.getElementById('punkte-input').value;
+            var pin = document.getElementById('pin-input').value;
+
+            if (!punkte || !pin) {
+                document.getElementById('error-message').textContent = 'Bitte füllen Sie alle Felder aus.';
+                document.getElementById('error-message').style.display = 'block';
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append('startnummer', startnummer);
+            formData.append('runde', aktiveRunde);
+            formData.append('punkte', punkte);
+            formData.append('pin', pin);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '../turnier/punkte_eingeben.php', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            if (response.success) {
+                                alert('Punkte erfolgreich gespeichert!');
+                                closePunkteEingabe();
+                                window.location.reload();
+                            } else {
+                                document.getElementById('error-message').textContent = response.message || 'Fehler beim Speichern der Punkte.';
+                                document.getElementById('error-message').style.display = 'block';
+                            }
+                        } catch (e) {
+                            document.getElementById('error-message').textContent = 'Fehler beim Verarbeiten der Antwort.';
+                            document.getElementById('error-message').style.display = 'block';
+                        }
+                    } else {
+                        document.getElementById('error-message').textContent = 'Fehler beim Speichern der Punkte.';
+                        document.getElementById('error-message').style.display = 'block';
+                    }
+                }
+            };
+            xhr.send(formData);
+        }
+
+        // Overlay schließen bei Klick außerhalb
+        document.addEventListener('click', function(e) {
+            var overlay = document.getElementById('punkte-overlay');
+            if (e.target === overlay) {
+                closePunkteEingabe();
+            }
         });
     </script>
 </head>
@@ -556,7 +819,10 @@ if ($aktiveErgebnisRunde !== null) {
         <h1><?php echo htmlspecialchars($aktuellesTurnier['titel']); ?></h1>
         
         <div class="info-box">
-            <p><strong>Datum:</strong> <?php echo htmlspecialchars($aktuellesTurnier['datum']); ?></p>
+            <p style="display: flex; justify-content: space-between; align-items: center;">
+                <span><strong>Datum:</strong> <?php echo htmlspecialchars($aktuellesTurnier['datum']); ?></span>
+                <span id="sekundenzaehler" style="font-weight: bold; color: #667eea; font-size: 14px;">0 Sekunden</span>
+            </p>
             <p><strong>Ort:</strong> <?php echo htmlspecialchars($aktuellesTurnier['ort']); ?></p>
             <?php if (isset($_SESSION['startnummer']) && $_SESSION['startnummer'] !== ''): ?>
                 <p>
@@ -565,10 +831,20 @@ if ($aktiveErgebnisRunde !== null) {
                         <?php echo htmlspecialchars($_SESSION['startnummer']); ?>
                     </span>
                 </p>
+                <?php if ($spielerName !== null): ?>
+                    <p style="margin-top: 5px; margin-left: 20px; color: #666;">
+                        <strong>Name:</strong> <?php echo htmlspecialchars($spielerName); ?>
+                    </p>
+                <?php endif; ?>
             <?php endif; ?>
             <?php if ($aktiveRunde !== null): ?>
                 <p>&nbsp;</p>
-                <p><strong>Aktive Runde:</strong> <?php echo $aktiveRunde; ?></p>
+                <p style="display: flex; align-items: center; justify-content: space-between;">
+                    <span><strong>Aktive Runde:</strong> <?php echo $aktiveRunde; ?></span>
+                    <?php if ($startnummerAktuell !== null): ?>
+                        <a href="punkte_eingabe.php" id="meine-punkte-button" class="meine-punkte-btn" style="text-decoration: none; display: inline-block;">meine Punkte</a>
+                    <?php endif; ?>
+                </p>
                 <?php if ($spielerTisch !== null && $startnummerAktuell !== null): ?>
                     <p>Person <?php echo htmlspecialchars($startnummerAktuell); ?> - Tisch <?php echo htmlspecialchars($spielerTisch); ?></p>
                 <?php endif; ?>
@@ -592,7 +868,7 @@ if ($aktiveErgebnisRunde !== null) {
         </div>
         
         <?php if ($aktiveRunde !== null): ?>
-            <h2>Personenzuordnung Runde <?php echo $aktiveRunde; ?></h2>
+            <h2>Person an Tisch - Runde: <?php echo $aktiveRunde; ?></h2>
             <table border="1">
                 <?php
                 $spaltenProZeile = 5;
@@ -601,7 +877,9 @@ if ($aktiveErgebnisRunde !== null) {
                     if ($spalte == 0) {
                         echo '<tr>';
                     }
-                    echo '<td style="padding: 8px;"><strong>Person: ' . htmlspecialchars($zuordnung['spieler_id']) . '</strong> Tisch ' . htmlspecialchars($zuordnung['tisch']) . '</td>';
+                    $isHighlighted = ($startnummerAktuell !== null && intval($zuordnung['spieler_id']) === $startnummerAktuell);
+                    $highlightClass = $isHighlighted ? ' highlighted-cell' : '';
+                    echo '<td class="' . $highlightClass . '" style="padding: 8px;"><strong>Person: ' . htmlspecialchars($zuordnung['spieler_id']) . '</strong> Tisch ' . htmlspecialchars($zuordnung['tisch']) . '</td>';
                     $spalte++;
                     if ($spalte >= $spaltenProZeile) {
                         echo '</tr>';
@@ -614,7 +892,7 @@ if ($aktiveErgebnisRunde !== null) {
                 ?>
             </table>
             
-            <h2>Tischzuordnung Runde <?php echo $aktiveRunde; ?></h2>
+            <h2>Tischpartner - Runde: <?php echo $aktiveRunde; ?></h2>
             <table border="1">
                 <?php
                 $tischeProZeile = 5;
@@ -630,7 +908,17 @@ if ($aktiveErgebnisRunde !== null) {
                         $zeileGestartet = true;
                     }
                     
-                    echo '<td style="padding: 10px; vertical-align: top;">';
+                    $isHighlighted = false;
+                    if ($startnummerAktuell !== null) {
+                        foreach ($spieler as $spielerId) {
+                            if (intval($spielerId) === $startnummerAktuell) {
+                                $isHighlighted = true;
+                                break;
+                            }
+                        }
+                    }
+                    $highlightClass = $isHighlighted ? ' highlighted-cell' : '';
+                    echo '<td class="' . $highlightClass . '" style="padding: 10px; vertical-align: top;">';
                     echo '<h3 style="margin: 0 0 10px 0; color: #667eea;">Tisch ' . htmlspecialchars($tisch) . '</h3>';
                     echo '<p style="margin: 0;">Person: ';
                     
@@ -677,7 +965,8 @@ if ($aktiveErgebnisRunde !== null) {
                     </thead>
                     <tbody>
                         <?php foreach ($ergebnisseMitRunden as $ergebnis): ?>
-                            <tr>
+                            <?php $isHighlighted = ($startnummerAktuell !== null && intval($ergebnis['startnummer']) === $startnummerAktuell); ?>
+                            <tr<?php echo $isHighlighted ? ' class="highlighted-row"' : ''; ?>>
                                 <td><?php echo htmlspecialchars($ergebnis['startnummer']); ?></td>
                                 <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                 <?php for ($i = 1; $i <= $anzahlRunden; $i++): ?>
@@ -702,7 +991,8 @@ if ($aktiveErgebnisRunde !== null) {
                     </thead>
                     <tbody>
                         <?php foreach ($rundenErgebnisse as $ergebnis): ?>
-                            <tr>
+                            <?php $isHighlighted = ($startnummerAktuell !== null && intval($ergebnis['startnummer']) === $startnummerAktuell); ?>
+                            <tr<?php echo $isHighlighted ? ' class="highlighted-row"' : ''; ?>>
                                 <td><?php echo htmlspecialchars($ergebnis['startnummer']); ?></td>
                                 <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                 <td><?php echo $ergebnis['punkte'] !== null ? htmlspecialchars($ergebnis['punkte']) : '-'; ?></td>

@@ -11,14 +11,7 @@ Email:
 
 Spieler Nr: 
 
-Runde 1:
-
-Summe Runde 1: ______________
-
-
-Runde 2:
-
-Summe Runde 2: ______________
+Gesamt Summe: ______________
 
 
 Runde 3:
@@ -26,6 +19,14 @@ Runde 3:
 Summe Runde 3: ______________
 
 
+Runde 2:
+
+Summe Runde 2: ______________
 
 
-Gesamt Summe: ______________
+Runde 1:
+
+Summe Runde 1: ______________
+
+
+PIN: ______________

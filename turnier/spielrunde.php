@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $startnummer = intval($_POST['startnummer'] ?? 0);
     $runde = intval($_POST['runde'] ?? 0);
     $punkte = isset($_POST['punkte']) && $_POST['punkte'] !== '' ? intval($_POST['punkte']) : null;
+    $gesperrt = isset($_POST['gesperrt']) && $_POST['gesperrt'] === '1' ? 1 : 0;
     
     if ($startnummer > 0 && $runde >= 1 && $runde <= $anzahlRunden) {
         // Prüfen, ob Teilnehmer existiert (nur ID prüfen)
@@ -36,6 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // Ergebnis in neue Tabelle speichern
             try {
                 speichereErgebnis($aktuellesTurnier['id'], $runde, $startnummer, $punkte);
+                
+                // Sperrstatus speichern
+                $stmt = $db->prepare("UPDATE turnier_registrierungen SET gesperrt = ? WHERE turnier_id = ? AND startnummer = ?");
+                $stmt->execute([$gesperrt, $aktuellesTurnier['id'], $startnummer]);
                 
                 // Weiterleitung mit beibehaltenen Parametern
                 $sortParam = isset($_POST['sort']) ? $_POST['sort'] : $sortierung;
@@ -61,7 +66,7 @@ $rundenErgebnisse = [];
 if ($aktuellesTurnier) {
     // Alle Registrierungen laden (mit JOIN zu anmeldungen für Name und name_auf_wertungsliste)
     $stmt = $db->prepare("
-        SELECT tr.startnummer, a.name, a.name_auf_wertungsliste 
+        SELECT tr.startnummer, tr.gesperrt, a.name, a.name_auf_wertungsliste 
         FROM turnier_registrierungen tr
         LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
         WHERE tr.turnier_id = ?
@@ -446,10 +451,17 @@ if ($aktuellesTurnier) {
                                     document.getElementById('punkte').value = '';
                                     document.getElementById('punkte').classList.remove('bestaetigt');
                                 }
+                                // Gesperrt-Status setzen
+                                if (data.gesperrt !== undefined) {
+                                    document.getElementById('gesperrt').checked = data.gesperrt;
+                                } else {
+                                    document.getElementById('gesperrt').checked = false;
+                                }
                             } else {
                                 document.getElementById('name-anzeige').textContent = data.error || 'Teilnehmer nicht gefunden';
                                 document.getElementById('punkte').value = '';
                                 document.getElementById('punkte').classList.remove('bestaetigt');
+                                document.getElementById('gesperrt').checked = false;
                             }
                         } catch (e) {
                             document.getElementById('name-anzeige').textContent = 'Fehler beim Laden';
@@ -511,6 +523,13 @@ if ($aktuellesTurnier) {
                             <div class="form-group">
                                 <label for="punkte">Gesamtpunktzahl Runde <?php echo $gewaehlteRunde; ?>:</label>
                                 <input type="number" id="punkte" name="punkte" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="gesperrt" name="gesperrt" value="1" style="width: auto; cursor: pointer;">
+                                    <span>Spieler sperren</span>
+                                </label>
+                                <small style="display: block; color: #666; margin-top: 5px;">Wenn aktiviert, kann der Spieler seine Punkte nicht mehr selbst eingeben.</small>
                             </div>
                             <div class="form-group">
                                 <button type="submit" class="btn">Speichern</button>

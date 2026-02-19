@@ -20,7 +20,7 @@ $db = getDB();
 
 // Name aus turnier_registrierungen holen (mit JOIN zu anmeldungen)
 $stmt = $db->prepare("
-    SELECT a.name 
+    SELECT a.name, tr.gesperrt 
     FROM turnier_registrierungen tr
     LEFT JOIN anmeldungen a ON tr.anmeldung_id = a.id
     WHERE tr.turnier_id = ? AND tr.startnummer = ?
@@ -35,7 +35,8 @@ if ($registrierung) {
     echo json_encode([
         'success' => true,
         'name' => $registrierung['name'],
-        'punkte' => $ergebnis && $ergebnis['punkte'] !== null ? intval($ergebnis['punkte']) : null
+        'punkte' => $ergebnis && $ergebnis['punkte'] !== null ? intval($ergebnis['punkte']) : null,
+        'gesperrt' => isset($registrierung['gesperrt']) && intval($registrierung['gesperrt']) === 1
     ]);
 } else {
     echo json_encode(['success' => false, 'error' => 'Teilnehmer nicht gefunden']);

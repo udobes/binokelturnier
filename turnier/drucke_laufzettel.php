@@ -31,6 +31,7 @@ $stmt = $db->prepare("
         tr.turnier_id,
         tr.anmeldung_id,
         tr.startnummer,
+        tr.pin,
         a.name,
         a.email,
         a.mobilnummer
@@ -52,6 +53,7 @@ $laufzettelDaten = [
     'email' => $registrierung['email'] ?? '',
     'mobilnummer' => $registrierung['mobilnummer'] ?? '',
     'registrier_nummer' => $registrierung['anmeldung_id'],
+    'pin' => $registrierung['pin'] ?? '',
     'turnier' => $aktuellesTurnier
 ];
 
@@ -67,6 +69,7 @@ $laufzettel = str_replace('Spieler/Runde:', 'Spieler/Runde: ' . ($laufzettelDate
 $laufzettel = str_replace('Name:', 'Name: ' . $laufzettelDaten['name'], $laufzettel);
 $laufzettel = str_replace('Email:', 'Email: ' . ($laufzettelDaten['email'] ?? ''), $laufzettel);
 $laufzettel = str_replace('Spieler Nr: ', 'Spieler Nr: ' . $laufzettelDaten['startnummer'], $laufzettel);
+$laufzettel = str_replace('PIN: ______________', 'PIN: ' . ($laufzettelDaten['pin'] ?? ''), $laufzettel);
 
 // Text auf 80 Zeichen Breite begrenzen und bereinigen
 $laufzettelLines = explode("\n", $laufzettel);

@@ -112,12 +112,19 @@ if (isset($_POST['registrierung_nummer'])) {
                         : "Registrierung erfolgreich abgeschlossen.";
                     
                     // Daten für Laufzettel-Overlay vorbereiten
+                    // PIN aus Datenbank holen
+                    $db = getDB();
+                    $stmt = $db->prepare("SELECT pin FROM turnier_registrierungen WHERE turnier_id = ? AND anmeldung_id = ? AND startnummer = ?");
+                    $stmt->execute([$aktuellesTurnier['id'], $registrierNummer, $result['startnummer']]);
+                    $pinData = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
                     $laufzettelDaten = [
                         'startnummer' => $result['startnummer'],
                         'name' => $name,
                         'email' => $email,
                         'mobilnummer' => $mobilnummer,
                         'registrier_nummer' => $registrierNummer,
+                        'pin' => $pinData['pin'] ?? '',
                         'turnier' => $aktuellesTurnier
                     ];
                     $_SESSION['laufzettel_daten'] = $laufzettelDaten;
@@ -160,12 +167,19 @@ if (isset($_POST['registrierung_neu'])) {
                     }
                     
                     // Daten für Laufzettel-Overlay vorbereiten
+                    // PIN aus Datenbank holen
+                    $db = getDB();
+                    $stmt = $db->prepare("SELECT pin FROM turnier_registrierungen WHERE turnier_id = ? AND anmeldung_id = ? AND startnummer = ?");
+                    $stmt->execute([$aktuellesTurnier['id'], $registrierNummer, $result['startnummer']]);
+                    $pinData = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
                     $laufzettelDaten = [
                         'startnummer' => $result['startnummer'],
                         'name' => $name,
                         'email' => $email,
                         'mobilnummer' => $mobilnummer,
                         'registrier_nummer' => $registrierNummer,
+                        'pin' => $pinData['pin'] ?? '',
                         'turnier' => $aktuellesTurnier
                     ];
                     $_SESSION['laufzettel_daten'] = $laufzettelDaten;
@@ -976,8 +990,16 @@ if (!empty($laufzettelDaten['email'])) {
 }
 $laufzettelHTML .= '</div>';
 
-// Runden generieren
-for ($runde = 1; $runde <= $anzahlRunden; $runde++) {
+// Gesamt Summe zuerst
+$laufzettelHTML .= '<div class="laufzettel-summe-spacer"></div>';
+$laufzettelHTML .= '<div class="laufzettel-summe">';
+$laufzettelHTML .= '<table class="runde-table summe-table">';
+$laufzettelHTML .= '<tr><td class="runde-label summe-label">Gesamt Summe:</td><td class="runde-field summe-field"></td></tr>';
+$laufzettelHTML .= '</table>';
+$laufzettelHTML .= '</div>';
+
+// Runden generieren (absteigend: Runde 3, 2, 1)
+for ($runde = $anzahlRunden; $runde >= 1; $runde--) {
     $laufzettelHTML .= '<div class="laufzettel-runde">';
     $laufzettelHTML .= '<h2 class="runde-title">Runde ' . $runde . ':</h2>';
     $laufzettelHTML .= '<table class="runde-table">';
@@ -986,10 +1008,10 @@ for ($runde = 1; $runde <= $anzahlRunden; $runde++) {
     $laufzettelHTML .= '</div>';
 }
 
-$laufzettelHTML .= '<div class="laufzettel-summe-spacer"></div>';
-$laufzettelHTML .= '<div class="laufzettel-summe">';
-$laufzettelHTML .= '<table class="runde-table summe-table">';
-$laufzettelHTML .= '<tr><td class="runde-label summe-label">Gesamt Summe:</td><td class="runde-field summe-field"></td></tr>';
+// PIN am Ende
+$laufzettelHTML .= '<div class="laufzettel-pin">';
+$laufzettelHTML .= '<table class="runde-table pin-table">';
+$laufzettelHTML .= '<tr><td class="runde-label pin-label">PIN:</td><td class="runde-field pin-field">' . htmlspecialchars($laufzettelDaten['pin'] ?? '', ENT_QUOTES, 'UTF-8') . '</td></tr>';
 $laufzettelHTML .= '</table>';
 $laufzettelHTML .= '</div>';
 

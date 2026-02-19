@@ -159,17 +159,19 @@ $aktiveErgebnisRunde = isset($aktuellesTurnier['aktive_ergebnis_runde'])
     </style>
     <script>
         function setAktiveRunde(runde) {
+            var xhr = new XMLHttpRequest();
+            var url, formData = new FormData();
+            
             if (runde === null) {
                 // Alle Runden deaktivieren
-                window.location.href = 'runde_deaktivieren.php';
-                return;
+                url = 'runde_deaktivieren.php';
+            } else {
+                // Bestimmte Runde aktivieren
+                url = 'runde_aktivieren.php';
+                formData.append('runde', runde);
             }
 
-            var formData = new FormData();
-            formData.append('runde', runde);
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'runde_aktivieren.php', true);
+            xhr.open('POST', url, true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
@@ -178,7 +180,7 @@ $aktiveErgebnisRunde = isset($aktuellesTurnier['aktive_ergebnis_runde'])
                             if (response.success) {
                                 window.location.reload();
                             } else {
-                                alert('Fehler: ' + (response.error || 'Unbekannter Fehler'));
+                                alert('Fehler: ' + (response.error || response.message || 'Unbekannter Fehler'));
                             }
                         } catch (e) {
                             window.location.reload();
@@ -193,7 +195,8 @@ $aktiveErgebnisRunde = isset($aktuellesTurnier['aktive_ergebnis_runde'])
 
         function setAktiveErgebnisRunde(runde) {
             var formData = new FormData();
-            formData.append('runde', runde);
+            // Wenn runde null ist, als String 'null' senden (PHP erwartet String)
+            formData.append('runde', runde === null ? 'null' : runde);
 
             var xhr = new XMLHttpRequest();
             xhr.open('POST', 'ergebnis_runde_aktivieren.php', true);
@@ -230,7 +233,7 @@ $aktiveErgebnisRunde = isset($aktuellesTurnier['aktive_ergebnis_runde'])
 
         <div class="section">
             <div class="section-header">
-                <h2>1. Anzeige der Tischzuordnung (aktive Runde)</h2>
+                <h2>1. Anzeige der Tischzuordnung</h2>
                 <small>Wirkt sich auf die Abschnitt „Personenzuordnung“ und „Tischzuordnung“ der Info-Seite aus.</small>
             </div>
             <p>
@@ -296,7 +299,7 @@ $aktiveErgebnisRunde = isset($aktuellesTurnier['aktive_ergebnis_runde'])
                 <button
                     type="button"
                     class="btn btn-danger"
-                    onclick="setAktiveErgebnisRunde('null')"
+                    onclick="setAktiveErgebnisRunde(null)"
                 >
                     Ergebnisanzeige deaktivieren
                 </button>

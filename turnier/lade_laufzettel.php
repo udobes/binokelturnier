@@ -30,6 +30,7 @@ $stmt = $db->prepare("
         tr.turnier_id,
         tr.anmeldung_id,
         tr.startnummer,
+        tr.pin,
         a.name,
         a.email,
         a.mobilnummer
@@ -51,6 +52,7 @@ $laufzettelDaten = [
     'email' => $registrierung['email'] ?? '',
     'mobilnummer' => $registrierung['mobilnummer'] ?? '',
     'registrier_nummer' => $registrierung['anmeldung_id'],
+    'pin' => $registrierung['pin'] ?? '',
     'turnier' => $aktuellesTurnier
 ];
 
@@ -77,20 +79,28 @@ if (!empty($laufzettelDaten['email'])) {
 }
 $laufzettelHTML .= '</div>';
 
-// Runden generieren
-for ($runde = 1; $runde <= $anzahlRunden; $runde++) {
-    $laufzettelHTML .= '<div class="laufzettel-runde">';
-    $laufzettelHTML .= '<h2 class="runde-title">Runde ' . $runde . ':</h2>';
-    $laufzettelHTML .= '<table class="runde-table">';
-    $laufzettelHTML .= '<tr><td class="runde-label">Summe Runde' . $runde . ':</td><td class="runde-field"></td></tr>';
-    $laufzettelHTML .= '</table>';
-    $laufzettelHTML .= '</div>';
-}
-
+// Gesamt Summe zuerst
 $laufzettelHTML .= '<div class="laufzettel-summe-spacer"></div>';
 $laufzettelHTML .= '<div class="laufzettel-summe">';
 $laufzettelHTML .= '<table class="runde-table summe-table">';
 $laufzettelHTML .= '<tr><td class="runde-label summe-label">Gesamt Summe:</td><td class="runde-field summe-field"></td></tr>';
+$laufzettelHTML .= '</table>';
+$laufzettelHTML .= '</div>';
+
+// Runden generieren (absteigend: Runde 3, 2, 1)
+for ($runde = $anzahlRunden; $runde >= 1; $runde--) {
+    $laufzettelHTML .= '<div class="laufzettel-runde">';
+    $laufzettelHTML .= '<h2 class="runde-title">Runde ' . $runde . ':</h2>';
+    $laufzettelHTML .= '<table class="runde-table">';
+    $laufzettelHTML .= '<tr><td class="runde-label">Summe Runde ' . $runde . ':</td><td class="runde-field"></td></tr>';
+    $laufzettelHTML .= '</table>';
+    $laufzettelHTML .= '</div>';
+}
+
+// PIN am Ende
+$laufzettelHTML .= '<div class="laufzettel-pin">';
+$laufzettelHTML .= '<table class="runde-table pin-table">';
+$laufzettelHTML .= '<tr><td class="runde-label pin-label">PIN:</td><td class="runde-field pin-field">' . htmlspecialchars($laufzettelDaten['pin'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
 $laufzettelHTML .= '</table>';
 $laufzettelHTML .= '</div>';
 
