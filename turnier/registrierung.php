@@ -333,6 +333,20 @@ if ($aktuellesTurnier) {
             margin-bottom: 30px;
             border: 2px solid #667eea;
         }
+        .registration-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .registration-container .registration-box {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        @media (max-width: 768px) {
+            .registration-container {
+                flex-direction: column;
+            }
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -792,13 +806,9 @@ if ($aktuellesTurnier) {
                 Kein aktives Turnier gefunden. Bitte erst ein Turnier erfassen und aktivieren.
             </div>
         <?php else: ?>
-            <div class="info-box">
-                <p><strong>Aktuelles Turnier:</strong> <?php echo htmlspecialchars($aktuellesTurnier['titel']); ?></p>
-                <p><strong>Registrierte Teilnehmer:</strong> <?php echo count($registrierungen); ?> / <?php echo htmlspecialchars($aktuellesTurnier['anzahl_spieler']); ?></p>
-            </div>
-            
-            <div class="registration-box">
-                <h2>Registrierung über Registriernummer</h2>
+            <div class="registration-container">
+                <div class="registration-box">
+                    <h2>Registrierung über Registriernummer</h2>
                 <?php if (!$anmeldungDaten): ?>
                     <form method="POST">
                         <input type="hidden" name="lade_daten" value="1">
@@ -872,10 +882,10 @@ if ($aktuellesTurnier) {
                         </div>
                     </form>
                 <?php endif; ?>
-            </div>
-            
-            <div class="registration-box">
-                <h2>Neue Person registrieren</h2>
+                </div>
+                
+                <div class="registration-box">
+                    <h2>Neue Person registrieren</h2>
                 <form method="POST">
                     <input type="hidden" name="registrierung_neu" value="1">
                     <div class="form-group">
@@ -904,6 +914,7 @@ if ($aktuellesTurnier) {
                     </div>
                     <button type="submit" class="btn">Registrieren</button>
                 </form>
+                </div>
             </div>
             
             <h2>Registrierte Teilnehmer</h2>

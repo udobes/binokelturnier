@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'config.php';
 
 // Datenbank initialisieren
@@ -10,14 +11,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Daten aus dem Formular holen
+// CSRF-Token prüfen
+$csrfToken = $_POST['csrf_token'] ?? '';
+if (empty($csrfToken) || empty($_SESSION['anmeldung_csrf_token']) || !hash_equals($_SESSION['anmeldung_csrf_token'], $csrfToken)) {
+    // Ungültiger oder fehlender Token – mögliche Manipulation
+    unset($_SESSION['anmeldung_csrf_token']);
+    header('Location: index.php?error=security');
+    exit;
+}
+
+// Daten aus dem Formular holen (grundsätzlich immer serverseitig prüfen)
 $name = trim($_POST['name'] ?? '');
 $email = trim($_POST['email'] ?? '');
 $mobilnummer = trim($_POST['mobilnummer'] ?? '');
-$alter = isset($_POST['alter']) && !empty($_POST['alter']) ? intval($_POST['alter']) : null;
+$alter = isset($_POST['alter']) && $_POST['alter'] !== '' ? intval($_POST['alter']) : null;
 $nameAufWertungsliste = isset($_POST['name_auf_wertungsliste']) && $_POST['name_auf_wertungsliste'] == '1' ? 1 : 0;
-$turnierId = isset($_POST['turnier_id']) && !empty($_POST['turnier_id']) ? intval($_POST['turnier_id']) : null;
+$turnierId = isset($_POST['turnier_id']) && $_POST['turnier_id'] !== '' ? intval($_POST['turnier_id']) : null;
 $datenschutz = isset($_POST['datenschutz']) && $_POST['datenschutz'] == '1';
+
+// Rohwerte für erneute Formularanzeige in der Session merken (ohne sie in die URL zu schreiben)
+$_SESSION['anmeldung_form_values'] = [
+    'name' => $name,
+    'email' => $email,
+    'mobilnummer' => $mobilnummer,
+    'alter' => ($alter !== null ? (string)$alter : ''),
+    'name_auf_wertungsliste' => $nameAufWertungsliste ? '1' : '0',
+];
 
 // Falls keine Turnier-ID per POST, versuche Standard-Turnier aus DB zu holen
 if (!$turnierId) {
@@ -71,9 +90,10 @@ if ($turnierId) {
     }
 }
 
-// Validierung
-if (empty($name) || empty($email)) {
-    $redirectParams = 'error=empty&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
+// Validierung (zusätzlich zur HTML-Validierung im Browser, schützt vor Manipulation)
+// 1. Pflichtfelder prüfen
+if ($name === '' || $email === '') {
+    $redirectParams = 'error=empty';
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -81,8 +101,19 @@ if (empty($name) || empty($email)) {
     exit;
 }
 
+// 2. Maximale Längen begrenzen
+if (mb_strlen($name) > 200 || mb_strlen($email) > 255 || mb_strlen($mobilnummer) > 50) {
+    $redirectParams = 'error=validation';
+    if ($turnierId) {
+        $redirectParams .= '&turnier=' . $turnierId;
+    }
+    header('Location: index.php?' . $redirectParams);
+    exit;
+}
+
+// 3. E-Mail-Format serverseitig prüfen
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $redirectParams = 'error=email&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
+    $redirectParams = 'error=email';
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -90,8 +121,29 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
+// 4. Alter (falls angegeben) auf sinnvolle Werte prüfen
+if ($alter !== null && ($alter < 0 || $alter > 120)) {
+    $redirectParams = 'error=validation';
+    if ($turnierId) {
+        $redirectParams .= '&turnier=' . $turnierId;
+    }
+    header('Location: index.php?' . $redirectParams);
+    exit;
+}
+
+// 5. Mobilnummer grob auf erlaubte Zeichen prüfen (Ziffern, +, Leerzeichen, /, -, Klammern)
+if ($mobilnummer !== '' && !preg_match('/^[0-9+\s\/\-\(\)]*$/', $mobilnummer)) {
+    $redirectParams = 'error=validation';
+    if ($turnierId) {
+        $redirectParams .= '&turnier=' . $turnierId;
+    }
+    header('Location: index.php?' . $redirectParams);
+    exit;
+}
+
+// 6. Datenschutz muss aktiv bestätigt sein
 if (!$datenschutz) {
-    $redirectParams = 'error=datenschutz&name=' . urlencode($name) . '&email=' . urlencode($email) . '&mobilnummer=' . urlencode($mobilnummer) . '&alter=' . urlencode($alter ?? '') . '&name_auf_wertungsliste=' . ($nameAufWertungsliste ? '1' : '0');
+    $redirectParams = 'error=datenschutz';
     if ($turnierId) {
         $redirectParams .= '&turnier=' . $turnierId;
     }
@@ -159,9 +211,12 @@ try {
     // 2. Info-Mail an den Administrator
     @sendAdminNotification($name, $email, $anmeldungId, $mobilnummer);
     
-    // Erfolgreich weiterleiten mit E-Mail-Adresse und Registriernummer
-    // Verwende absolute URL oder relative URL ohne Probleme
-    $redirectUrl = 'index.php?success=1&email=' . urlencode($email) . '&id=' . urlencode($anmeldungId);
+    // Erfolgreich weiterleiten – persönliche Daten NICHT über die URL, sondern über die Session
+    $_SESSION['anmeldung_success_email'] = $email;
+    $_SESSION['anmeldung_success_id'] = $anmeldungId;
+
+    // Verwende schlanke URL ohne Formular-Daten
+    $redirectUrl = 'index.php?success=1';
     if ($turnierId) {
         $redirectUrl .= '&turnier=' . $turnierId;
     }

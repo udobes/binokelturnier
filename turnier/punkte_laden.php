@@ -55,3 +55,4 @@ if ($ergebnis && $ergebnis['punkte'] !== null) {
 }
 ?>
 
+

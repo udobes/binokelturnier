@@ -606,6 +606,10 @@ function registriereDurchNummerMitDaten($turnierId, $registrierNummer, $name, $e
 }
 
 // Neue Person registrieren
+// Hinweis:
+// - Wenn im Formular keine E-Mail angegeben wird, wird in der Datenbank eine leere Zeichenkette ("") gespeichert,
+//   damit KEINE künstliche/Platzhalter-Mailadresse entsteht.
+// - Die Person wird direkt dem übergebenen Turnier ($turnierId) zugeordnet.
 function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = null, $alter = null, $nameAufWertungsliste = 0) {
     $db = getDB();
     
@@ -620,12 +624,14 @@ function registriereNeuePerson($turnierId, $name, $email = null, $mobilnummer = 
     }
     initDB(); // Sicherstellen, dass Tabelle existiert
     
-    // E-Mail ist erforderlich für anmeldungen, falls nicht vorhanden, verwenden wir eine Platzhalter-E-Mail
-    $emailFuerAnmeldung = !empty($email) ? $email : 'keine-email-' . time() . '@turnier.local';
+    // E-Mail ggf. leer lassen, wenn im Formular nichts eingetragen wurde
+    // (leere Zeichenkette ist KEINE gültige Mailadresse, erfüllt aber NOT NULL in der Tabelle)
+    $emailFuerAnmeldung = !empty($email) ? $email : '';
     
     $anmeldedatum = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer, \"alter\", name_auf_wertungsliste) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$anmeldedatum, $name, $emailFuerAnmeldung, $mobilnummer, $alter, $nameAufWertungsliste]);
+    // Neue Anmeldung direkt dem aktuellen Turnier zuordnen (turnier_id)
+    $stmt = $db->prepare("INSERT INTO anmeldungen (anmeldedatum, name, email, mobilnummer, \"alter\", name_auf_wertungsliste, turnier_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$anmeldedatum, $name, $emailFuerAnmeldung, $mobilnummer, $alter, $nameAufWertungsliste, $turnierId]);
     $anmeldungId = $db->lastInsertId();
     
     // Falls lastInsertId() fehlschlägt, ID aus DB holen

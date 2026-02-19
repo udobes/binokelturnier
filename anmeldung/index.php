@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'config.php';
 require_once __DIR__ . '/../turnier/config.php';
 initDB();
@@ -109,62 +110,13 @@ if ($turnier && !empty($turnier['datum'])) {
         <?php elseif (isset($_GET['success'])): ?>
             <div class="message success">
                 <?php
-                // URL-Parameter direkt aus $_GET lesen
-                // Prüfe auch auf "amp;email" und "amp;id" falls & zu &amp; encodiert wurde
-                $emailRaw = $_GET['email'] ?? $_GET['amp;email'] ?? '';
-                $registriernummerRaw = $_GET['id'] ?? $_GET['amp;id'] ?? '';
-                
-                // Falls Parameter mit "amp;" gefunden wurden, parse die Query-String manuell
-                if (empty($emailRaw) && empty($registriernummerRaw) && isset($_SERVER['QUERY_STRING'])) {
-                    // Ersetze &amp; durch & und parse dann
-                    $queryString = str_replace('&amp;', '&', $_SERVER['QUERY_STRING']);
-                    $queryString = str_replace('amp;', '', $queryString); // Falls "amp;" ohne & vorkommt
-                    parse_str($queryString, $parsedParams);
-                    $emailRaw = $parsedParams['email'] ?? '';
-                    $registriernummerRaw = $parsedParams['id'] ?? '';
-                }
-                
-                // Falls immer noch leer, versuche direkt aus den falsch geparsten Parametern
-                if (empty($emailRaw) && isset($_GET['amp;email'])) {
-                    $emailRaw = $_GET['amp;email'];
-                }
-                if (empty($registriernummerRaw) && isset($_GET['amp;id'])) {
-                    $registriernummerRaw = $_GET['amp;id'];
-                }
-                
-                $email = !empty($emailRaw) ? htmlspecialchars($emailRaw, ENT_QUOTES, 'UTF-8') : '';
-                $registriernummer = !empty($registriernummerRaw) ? trim(htmlspecialchars($registriernummerRaw, ENT_QUOTES, 'UTF-8')) : '';
-                
-                // Debug: Konsolen-Ausgabe für URL-Parameter
-                echo '<script>console.log("=== Registriernummer Debug ===");';
-                echo 'console.log("Alle GET-Parameter (roh):", ' . json_encode($_GET) . ');';
-                echo 'console.log("Query String:", ' . json_encode($_SERVER['QUERY_STRING'] ?? '') . ');';
-                echo 'console.log("URL Parameter id (roh):", ' . json_encode($registriernummerRaw) . ');';
-                echo 'console.log("URL Parameter email (roh):", ' . json_encode($emailRaw) . ');';
-                echo 'console.log("Registriernummer (verarbeitet):", ' . json_encode($registriernummer) . ');';
-                echo 'console.log("E-Mail (verarbeitet):", ' . json_encode($email) . ');';
-                
-                // Falls ID nicht in URL, versuche aus Datenbank zu holen (falls E-Mail vorhanden)
-                if (empty($registriernummer) && !empty($email)) {
-                    echo 'console.log("Registriernummer leer, versuche aus DB zu holen...");';
-                    require_once 'config.php';
-                    try {
-                        $db = getDB();
-                        $stmt = $db->prepare("SELECT id FROM anmeldungen WHERE email = ? ORDER BY id DESC LIMIT 1");
-                        $stmt->execute([$email]);
-                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-                        if ($result && isset($result['id'])) {
-                            $registriernummer = (string)$result['id'];
-                            echo 'console.log("Registriernummer aus DB geholt:", ' . json_encode($registriernummer) . ');';
-                        } else {
-                            echo 'console.log("Keine Registriernummer in DB gefunden");';
-                        }
-                    } catch (Exception $e) {
-                        echo 'console.error("Fehler beim Holen aus DB:", ' . json_encode($e->getMessage()) . ');';
-                    }
-                }
-                echo 'console.log("Finale Registriernummer:", ' . json_encode($registriernummer) . ');';
-                echo 'console.log("===========================");</script>';
+                // Erfolgsdaten aus der Session holen (werden von process.php gesetzt)
+                $email = $_SESSION['anmeldung_success_email'] ?? '';
+                $registriernummer = $_SESSION['anmeldung_success_id'] ?? '';
+                // Einmalige Anzeige, danach löschen
+                unset($_SESSION['anmeldung_success_email'], $_SESSION['anmeldung_success_id']);
+                $email = !empty($email) ? htmlspecialchars($email, ENT_QUOTES, 'UTF-8') : '';
+                $registriernummer = !empty($registriernummer) ? trim(htmlspecialchars($registriernummer, ENT_QUOTES, 'UTF-8')) : '';
                 ?>
                 <p><strong>Vielen Dank für die Anmeldung.</strong></p>
                 <?php if (!empty($registriernummer)): ?>
@@ -200,14 +152,24 @@ if ($turnier && !empty($turnier['datum'])) {
 
         <?php if ($anmeldungMoeglich && !isset($_GET['success'])): ?>
             <?php
-            // Vorherige Eingaben aus GET-Parametern holen (falls vorhanden)
-            $prevName = isset($_GET['name']) ? htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8') : '';
-            $prevEmail = isset($_GET['email']) ? htmlspecialchars($_GET['email'], ENT_QUOTES, 'UTF-8') : '';
-            $prevMobilnummer = isset($_GET['mobilnummer']) ? htmlspecialchars($_GET['mobilnummer'], ENT_QUOTES, 'UTF-8') : '';
-            $prevAlter = isset($_GET['alter']) ? htmlspecialchars($_GET['alter'], ENT_QUOTES, 'UTF-8') : '';
-            $prevNameAufWertungsliste = isset($_GET['name_auf_wertungsliste']) ? htmlspecialchars($_GET['name_auf_wertungsliste'], ENT_QUOTES, 'UTF-8') : '';
+            // Vorherige Eingaben aus der Session holen (werden von process.php gesetzt)
+            $formValues = $_SESSION['anmeldung_form_values'] ?? [];
+            $prevName = isset($formValues['name']) ? htmlspecialchars($formValues['name'], ENT_QUOTES, 'UTF-8') : '';
+            $prevEmail = isset($formValues['email']) ? htmlspecialchars($formValues['email'], ENT_QUOTES, 'UTF-8') : '';
+            $prevMobilnummer = isset($formValues['mobilnummer']) ? htmlspecialchars($formValues['mobilnummer'], ENT_QUOTES, 'UTF-8') : '';
+            $prevAlter = isset($formValues['alter']) ? htmlspecialchars($formValues['alter'], ENT_QUOTES, 'UTF-8') : '';
+            $prevNameAufWertungsliste = isset($formValues['name_auf_wertungsliste']) ? htmlspecialchars($formValues['name_auf_wertungsliste'], ENT_QUOTES, 'UTF-8') : '';
+            // Nach einmaliger Verwendung löschen
+            unset($_SESSION['anmeldung_form_values']);
             ?>
             <form action="process.php" method="POST">
+                <?php
+                // CSRF-Token setzen (einfacher Schutz gegen Formular-Manipulation)
+                if (empty($_SESSION['anmeldung_csrf_token'])) {
+                    $_SESSION['anmeldung_csrf_token'] = bin2hex(random_bytes(32));
+                }
+                ?>
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['anmeldung_csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
                 <input type="hidden" name="turnier_id" value="<?php echo $turnierId ? $turnierId : ''; ?>">
                 
                 <div class="form-group">
