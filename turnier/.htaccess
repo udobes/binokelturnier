@@ -1,4 +1,8 @@
 # HTTP Basic Auth für Turnierverwaltung
+# Ein Realm (AuthName) für den gesamten Ordner = einmal anmelden reicht für alle Module
+# WICHTIG: AuthUserFile muss der absolute Pfad auf dem WEBSERVER sein (z. B. Linux):
+#   /var/www/vhosts/aks-heroldstatt.de/httpdocs/binokel/data/.htpasswd
+# Unter Windows lokal: D:/www/aks-heroldstatt.de/binokel/data/.htpasswd
 AuthType Basic
 AuthName "Turnierverwaltung"
 AuthUserFile "D:/www/aks-heroldstatt.de/binokel/data/.htpasswd"

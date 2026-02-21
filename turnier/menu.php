@@ -77,6 +77,9 @@ initTurnierDB();
         <li class="menu-item">
             <a href="smartphone.php" target="content">7. Smartphone</a>
         </li>
+        <li class="menu-item">
+            <a href="admin.php" target="content">8. Admin</a>
+        </li>
     </ul>
     <script>
         // Aktives Menü-Element markieren und auf Smartphone Menü schließen
