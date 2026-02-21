@@ -101,7 +101,7 @@ if (empty($registrierung['pin']) || $registrierung['pin'] !== $pin) {
 
 // Punktzahl speichern
 try {
-    speichereErgebnis($aktuellesTurnier['id'], $runde, $startnummer, $punkte);
+    speichereErgebnis($aktuellesTurnier['id'], $runde, $startnummer, $punkte, 'Spieler');
     
     // Eingabe aus Session löschen, da erfolgreich gespeichert
     unset($_SESSION['punkte_eingabe']);

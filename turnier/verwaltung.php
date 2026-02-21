@@ -327,6 +327,7 @@ if ($selectedTurnierId) {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            background: white;
         }
         th, td {
             padding: 12px;
@@ -548,8 +549,12 @@ if ($selectedTurnierId) {
                 </select>
             </form>
             <?php if ($selectedTurnier): ?>
-                <div style="margin-top: 15px; padding: 15px; background: white; border: 1px solid #ddd; border-radius: 5px;">
-                    <h3 style="margin-top: 0; margin-bottom: 15px; color: #28a745;">✓ Ausgewähltes Turnier</h3>
+                <div class="ausgewaehltes-turnier-block" style="margin-top: 15px; padding: 15px; background: white; border: 1px solid #ddd; border-radius: 5px;">
+                    <h3 class="ausgewaehltes-turnier-toggle" style="margin-top: 0; margin-bottom: 0; padding: 10px 0; color: #28a745; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px;" title="Ein- oder ausklappen">
+                        <span class="ausgewaehltes-turnier-icon" style="display: inline-block; transition: transform 0.2s;">▶</span>
+                        <span>✓ Ausgewähltes Turnier</span>
+                    </h3>
+                    <div class="ausgewaehltes-turnier-inhalt" style="display: none; margin-top: 15px;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                         <tr>
                             <td style="padding: 8px; font-weight: bold; width: 150px; vertical-align: top;">ID:</td>
@@ -618,6 +623,7 @@ if ($selectedTurnierId) {
                             </td>
                         </tr>
                     </table>
+                    </div>
                 </div>
             <?php else: ?>
                 <p style="margin-top: 10px; color: #dc3545; font-weight: bold;">
@@ -741,6 +747,20 @@ if ($selectedTurnierId) {
     </div>
     
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var toggle = document.querySelector('.ausgewaehltes-turnier-toggle');
+            var inhalt = document.querySelector('.ausgewaehltes-turnier-inhalt');
+            var icon = document.querySelector('.ausgewaehltes-turnier-icon');
+            if (toggle && inhalt && icon) {
+                toggle.addEventListener('click', function() {
+                    var isOpen = inhalt.style.display !== 'none';
+                    inhalt.style.display = isOpen ? 'none' : 'block';
+                    icon.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+                    icon.textContent = isOpen ? '▶' : '▼';
+                });
+            }
+        });
+        
         function editRow(id) {
             document.getElementById('edit-' + id).classList.add('active');
         }

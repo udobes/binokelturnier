@@ -123,7 +123,7 @@ $EMAIL_TEMPLATE_CONFIRMATION = "
         </div>
         <p><strong>Für eine schnelle Anmeldung am Spielabend, halten Sie bitte Ihre Registriernummer bereit.</strong></p>
         <p>Bitte bringen Sie zur Veranstaltung ein Smartphone mit. Wir werden Spielparungen und Spielergebnisse individuell auf das Smartphone übertragen.</p>
-        <p>Weitere Informationen erhalten Sie in Kürze.</p>
+        <p>Wir freuen uns auf Ihre Teilnahme.</p>
         <p>Mit freundlichen Grüßen<br>
         Das Organisationsteam</p>
     </div>
@@ -156,7 +156,7 @@ Für eine schnelle Anmeldung am Spielabend, halten Sie bitte Ihre Registriernumm
 
 Bitte bringen Sie zur Veranstaltung ein Smartphone mit. Wir werden Tischeinteilung und Spielergebnisse individuell auf das Smartphone übertragen.
 
-Weitere Informationen erhalten Sie in Kürze.
+Wir freuen uns auf Ihre Teilnahme.
 
 Mit freundlichen Grüßen
 Das Organisationsteam

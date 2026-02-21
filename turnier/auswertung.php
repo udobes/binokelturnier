@@ -5,8 +5,17 @@ initTurnierDB();
 $aktuellesTurnier = getAktuellesTurnier();
 $anzahlRunden = $aktuellesTurnier ? intval($aktuellesTurnier['anzahl_runden'] ?? 3) : 3;
 $sortierung = isset($_GET['sort']) ? $_GET['sort'] : 'punktzahl';
-if (!in_array($sortierung, ['startnummer', 'punktzahl'])) {
+$erlaubteSort = array_merge(['startnummer', 'punktzahl', 'name', 'platzierung'], array_map(function($i) { return 'runde' . $i; }, range(1, $anzahlRunden)));
+if (!in_array($sortierung, $erlaubteSort)) {
     $sortierung = 'punktzahl';
+}
+// Richtung: erster Klick = Standard (Name/Platz/Startnummer: asc, Punkte/Runde: desc), erneuter Klick = umkehren
+if (isset($_GET['dir']) && $_GET['dir'] === 'desc') {
+    $sortDir = 'desc';
+} elseif (isset($_GET['dir']) && $_GET['dir'] === 'asc') {
+    $sortDir = 'asc';
+} else {
+    $sortDir = in_array($sortierung, ['punktzahl']) || preg_match('/^runde\d+$/', $sortierung) ? 'desc' : 'asc';
 }
 
 $aktiveErgebnisRunde = null;
@@ -29,20 +38,52 @@ if ($aktuellesTurnier) {
     // Alle Rundendaten laden (aus neuer Tabelle)
     $ergebnisseMitRunden = getErgebnisseFuerTurnier($aktuellesTurnier['id'], $anzahlRunden);
     
-    // Sortierung anwenden
+    // Sortierung anwenden (sortDir: asc = A-Z / klein nach groß, desc = Z-A / groß nach klein)
     if ($sortierung === 'punktzahl') {
-        usort($ergebnisseMitRunden, function($a, $b) {
+        usort($ergebnisseMitRunden, function($a, $b) use ($sortDir) {
             $punkteA = $a['gesamtpunkte'] !== null ? intval($a['gesamtpunkte']) : -1;
             $punkteB = $b['gesamtpunkte'] !== null ? intval($b['gesamtpunkte']) : -1;
             if ($punkteA === $punkteB) {
                 return $a['startnummer'] - $b['startnummer'];
             }
-            return ($punkteB - $punkteA); // DESC
+            $r = $punkteB - $punkteA; // desc = groß nach klein
+            return $sortDir === 'desc' ? $r : -$r;
+        });
+    } elseif ($sortierung === 'name') {
+        usort($ergebnisseMitRunden, function($a, $b) use ($sortDir) {
+            $nameA = isset($a['name']) ? (string)$a['name'] : '';
+            $nameB = isset($b['name']) ? (string)$b['name'] : '';
+            $cmp = strcasecmp($nameA, $nameB);
+            $r = $cmp !== 0 ? $cmp : ($a['startnummer'] - $b['startnummer']);
+            return $sortDir === 'asc' ? $r : -$r;
+        });
+    } elseif ($sortierung === 'platzierung') {
+        usort($ergebnisseMitRunden, function($a, $b) use ($sortDir) {
+            $platzA = isset($a['platzierung']) && $a['platzierung'] !== null && $a['platzierung'] !== '' ? intval($a['platzierung']) : 999999;
+            $platzB = isset($b['platzierung']) && $b['platzierung'] !== null && $b['platzierung'] !== '' ? intval($b['platzierung']) : 999999;
+            if ($platzA === $platzB) {
+                return $a['startnummer'] - $b['startnummer'];
+            }
+            // Erster Klick (asc): klein nach groß (1, 2, 3). Zweiter Klick (desc): groß nach klein (3, 2, 1)
+            $diff = $platzA - $platzB;
+            return ($sortDir === 'asc') ? $diff : -$diff;
+        });
+    } elseif (preg_match('/^runde(\d+)$/', $sortierung, $m)) {
+        $rundeIdx = 'runde' . $m[1] . '_punkte';
+        usort($ergebnisseMitRunden, function($a, $b) use ($rundeIdx, $sortDir) {
+            $pA = isset($a[$rundeIdx]) && $a[$rundeIdx] !== null ? intval($a[$rundeIdx]) : -1;
+            $pB = isset($b[$rundeIdx]) && $b[$rundeIdx] !== null ? intval($b[$rundeIdx]) : -1;
+            if ($pA === $pB) {
+                return $a['startnummer'] - $b['startnummer'];
+            }
+            $r = $pB - $pA; // desc = groß nach klein
+            return $sortDir === 'desc' ? $r : -$r;
         });
     } else {
         // Nach Startnummer sortieren
-        usort($ergebnisseMitRunden, function($a, $b) {
-            return $a['startnummer'] - $b['startnummer'];
+        usort($ergebnisseMitRunden, function($a, $b) use ($sortDir) {
+            $r = $a['startnummer'] - $b['startnummer']; // asc = klein nach groß
+            return $sortDir === 'asc' ? $r : -$r;
         });
     }
     
@@ -147,6 +188,7 @@ if ($aktuellesTurnier) {
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
+            background: white;
         }
         th, td {
             padding: 12px;
@@ -157,6 +199,14 @@ if ($aktuellesTurnier) {
             background: #667eea;
             color: white;
             font-weight: bold;
+        }
+        th a {
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        th a:hover {
+            text-decoration: underline;
         }
         tr:hover {
             background: #f9f9f9;
@@ -349,23 +399,30 @@ if ($aktuellesTurnier) {
                 </div>
                 <button type="button" class="btn-print" onclick="druckeTabelle()">Drucken</button>
             </div>
-            <div class="sortierung">
-                <label for="sort-select">Sortierung:</label>
-                <select id="sort-select" onchange="sortierungWechseln()">
-                    <option value="punktzahl" <?php echo $sortierung === 'punktzahl' ? 'selected' : ''; ?>>Punktzahl</option>
-                    <option value="startnummer" <?php echo $sortierung === 'startnummer' ? 'selected' : ''; ?>>Startnummer</option>
-                </select>
-            </div>
+            <?php
+            $sortBase = 'auswertung.php?sort=';
+            $dirParam = '&dir=';
+            $nextDir = function($col, $defaultAsc) use ($sortierung, $sortDir) {
+                if ($sortierung === $col) {
+                    return $sortDir === 'asc' ? 'desc' : 'asc';
+                }
+                return $defaultAsc ? 'asc' : 'desc';
+            };
+            $sortIcon = function($col) use ($sortierung, $sortDir) {
+                if ($sortierung !== $col) return '';
+                return $sortDir === 'desc' ? ' ▾' : ' ▴';
+            };
+            ?>
             <table id="tabelle-ergebnisse">
                 <thead>
                     <tr>
-                        <th>Startnummer</th>
-                        <th>Name</th>
-                        <?php for ($i = 1; $i <= $anzahlRunden; $i++): ?>
-                            <th>Runde <?php echo $i; ?></th>
+                        <th><a href="<?php echo $sortBase; ?>startnummer<?php echo $dirParam . $nextDir('startnummer', true); ?>">Startnummer<?php echo $sortIcon('startnummer'); ?></a></th>
+                        <th><a href="<?php echo $sortBase; ?>name<?php echo $dirParam . $nextDir('name', true); ?>">Name<?php echo $sortIcon('name'); ?></a></th>
+                        <?php for ($i = 1; $i <= $anzahlRunden; $i++): $rn = 'runde' . $i; ?>
+                            <th><a href="<?php echo $sortBase . $rn . $dirParam . $nextDir($rn, false); ?>">Runde <?php echo $i; ?><?php echo $sortIcon($rn); ?></a></th>
                         <?php endfor; ?>
-                        <th>Gesamt</th>
-                        <th>Platzierung</th>
+                        <th><a href="<?php echo $sortBase; ?>punktzahl<?php echo $dirParam . $nextDir('punktzahl', false); ?>">Gesamt<?php echo $sortIcon('punktzahl'); ?></a></th>
+                        <th><a href="<?php echo $sortBase; ?>platzierung<?php echo $dirParam . ($sortierung === 'platzierung' ? ($sortDir === 'asc' ? 'desc' : 'asc') : 'asc'); ?>">Platzierung<?php echo $sortIcon('platzierung'); ?></a></th>
                     </tr>
                 </thead>
                 <tbody>

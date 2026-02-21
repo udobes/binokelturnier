@@ -79,13 +79,14 @@ initTurnierDB();
         </li>
     </ul>
     <script>
-        // Aktives Menü-Element markieren
+        // Aktives Menü-Element markieren und auf Smartphone Menü schließen
         document.querySelectorAll('.menu-item a').forEach(function(link) {
             link.addEventListener('click', function() {
                 document.querySelectorAll('.menu-item a').forEach(function(a) {
                     a.classList.remove('active');
                 });
                 this.classList.add('active');
+                try { window.parent.postMessage('turnierMenuClose', '*'); } catch (e) {}
             });
         });
     </script>

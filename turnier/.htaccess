@@ -1,0 +1,5 @@
+# HTTP Basic Auth für Turnierverwaltung
+AuthType Basic
+AuthName "Turnierverwaltung"
+AuthUserFile "D:/www/aks-heroldstatt.de/binokel/data/.htpasswd"
+Require valid-user

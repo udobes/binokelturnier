@@ -351,6 +351,7 @@ if ($aktuellesTurnier) {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            background: white;
         }
         th, td {
             padding: 10px;

@@ -279,6 +279,12 @@ function initTurnierDB() {
         // Index existiert bereits, ignorieren
     }
     
+    try {
+        $db->exec("ALTER TABLE turnier_ergebnisse ADD COLUMN geaendert_von TEXT DEFAULT NULL");
+    } catch (PDOException $e) {
+        // Spalte existiert bereits, ignorieren
+    }
+    
     // Migration: Bestehende Daten aus turnier_registrierungen migrieren
     try {
         // Prüfen, ob Migration bereits durchgeführt wurde
@@ -359,7 +365,7 @@ function deaktiviereAktiveErgebnisRunde($turnierId) {
 }
 
 // Ergebnis speichern oder aktualisieren
-function speichereErgebnis($turnierId, $runde, $spieler, $punkte) {
+function speichereErgebnis($turnierId, $runde, $spieler, $punkte, $geaendertVon = null) {
     $db = null;
     try {
         $db = getDB();
@@ -375,18 +381,18 @@ function speichereErgebnis($turnierId, $runde, $spieler, $punkte) {
         
         if ($existing) {
             // Aktualisieren
-            $stmt = $db->prepare("UPDATE turnier_ergebnisse SET punkte = ?, geaendert_am = ? WHERE erg_id = ?");
-            $stmt->execute([$punkte, $geaendertAm, $existing['erg_id']]);
+            $stmt = $db->prepare("UPDATE turnier_ergebnisse SET punkte = ?, geaendert_am = ?, geaendert_von = ? WHERE erg_id = ?");
+            $stmt->execute([$punkte, $geaendertAm, $geaendertVon, $existing['erg_id']]);
         } else {
             // Neu anlegen - verwende INSERT OR IGNORE mit nachfolgendem UPDATE falls nötig
-            $stmt = $db->prepare("INSERT OR IGNORE INTO turnier_ergebnisse (turnier_id, runde, spieler, punkte, geaendert_am) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$turnierId, $runde, $spieler, $punkte, $geaendertAm]);
+            $stmt = $db->prepare("INSERT OR IGNORE INTO turnier_ergebnisse (turnier_id, runde, spieler, punkte, geaendert_am, geaendert_von) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$turnierId, $runde, $spieler, $punkte, $geaendertAm, $geaendertVon]);
             
             // Prüfen, ob INSERT erfolgreich war (wenn nicht, existiert bereits ein Eintrag)
             if ($stmt->rowCount() == 0) {
                 // Eintrag existiert bereits, aktualisieren
-                $stmt = $db->prepare("UPDATE turnier_ergebnisse SET punkte = ?, geaendert_am = ? WHERE turnier_id = ? AND runde = ? AND spieler = ?");
-                $stmt->execute([$punkte, $geaendertAm, $turnierId, $runde, $spieler]);
+                $stmt = $db->prepare("UPDATE turnier_ergebnisse SET punkte = ?, geaendert_am = ?, geaendert_von = ? WHERE turnier_id = ? AND runde = ? AND spieler = ?");
+                $stmt->execute([$punkte, $geaendertAm, $geaendertVon, $turnierId, $runde, $spieler]);
             }
         }
         
@@ -431,7 +437,7 @@ function berechneGesamtpunkte($turnierId, $spieler) {
 // Ergebnis für einen Spieler in einer Runde abrufen
 function getErgebnis($turnierId, $runde, $spieler) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT punkte, geaendert_am FROM turnier_ergebnisse WHERE turnier_id = ? AND runde = ? AND spieler = ?");
+    $stmt = $db->prepare("SELECT punkte, geaendert_am, geaendert_von FROM turnier_ergebnisse WHERE turnier_id = ? AND runde = ? AND spieler = ?");
     $stmt->execute([$turnierId, $runde, $spieler]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
@@ -474,7 +480,7 @@ function getErgebnisseFuerTurnier($turnierId, $anzahlRunden) {
 // Alle Turniere holen (sortiert nach Datum)
 function getAllTurniere() {
     $db = getDB();
-    $stmt = $db->query("SELECT * FROM turnier ORDER BY datum DESC, id DESC");
+    $stmt = $db->query("SELECT * FROM turnier ORDER BY id DESC");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 

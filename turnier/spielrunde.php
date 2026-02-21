@@ -1,20 +1,39 @@
 <?php
+session_start();
 require_once 'config.php';
 initTurnierDB();
 
 $aktuellesTurnier = getAktuellesTurnier();
-$gewaehlteRunde = isset($_GET['runde']) ? intval($_GET['runde']) : (isset($_POST['runde']) ? intval($_POST['runde']) : 1);
 $anzahlRunden = $aktuellesTurnier ? intval($aktuellesTurnier['anzahl_runden'] ?? 3) : 3;
-$sortierung = isset($_GET['sort']) ? $_GET['sort'] : 'punktzahl';
+
+// Runde: zuerst aus GET/POST, sonst zuletzt gemerkte Runde aus Session, sonst 1
+$gewaehlteRunde = isset($_GET['runde']) ? intval($_GET['runde']) : (isset($_POST['runde']) ? intval($_POST['runde']) : null);
+if ($gewaehlteRunde === null && isset($_SESSION['spielrunde_runde'])) {
+    $gewaehlteRunde = intval($_SESSION['spielrunde_runde']);
+}
+if ($gewaehlteRunde === null) {
+    $gewaehlteRunde = 1;
+}
 
 // Validierung der gewählten Runde
 if ($gewaehlteRunde < 1 || $gewaehlteRunde > $anzahlRunden) {
     $gewaehlteRunde = 1;
 }
+$_SESSION['spielrunde_runde'] = $gewaehlteRunde;
+
+$sortierung = isset($_GET['sort']) ? $_GET['sort'] : 'eingabe';
 
 $db = getDB();
-if (!in_array($sortierung, ['startnummer', 'punktzahl', 'eingabe'])) {
-    $sortierung = 'punktzahl';
+if (!in_array($sortierung, ['startnummer', 'punktzahl', 'eingabe', 'von', 'name'])) {
+    $sortierung = 'eingabe';
+}
+// Richtung: erster Klick = Standard (Name/Von/Startnummer: asc, Punkte/Eingabe: desc), erneuter Klick = umkehren
+if (isset($_GET['dir']) && $_GET['dir'] === 'desc') {
+    $sortDir = 'desc';
+} elseif (isset($_GET['dir']) && $_GET['dir'] === 'asc') {
+    $sortDir = 'asc';
+} else {
+    $sortDir = in_array($sortierung, ['punktzahl', 'eingabe']) ? 'desc' : 'asc';
 }
 
 
@@ -36,7 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($registrierung) {
             // Ergebnis in neue Tabelle speichern
             try {
-                speichereErgebnis($aktuellesTurnier['id'], $runde, $startnummer, $punkte);
+                $geaendertVon = !empty($_SERVER['REMOTE_USER']) ? $_SERVER['REMOTE_USER'] : 'Turnierleitung';
+                speichereErgebnis($aktuellesTurnier['id'], $runde, $startnummer, $punkte, $geaendertVon);
                 
                 // Sperrstatus speichern
                 $stmt = $db->prepare("UPDATE turnier_registrierungen SET gesperrt = ? WHERE turnier_id = ? AND startnummer = ?");
@@ -44,7 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 
                 // Weiterleitung mit beibehaltenen Parametern
                 $sortParam = isset($_POST['sort']) ? $_POST['sort'] : $sortierung;
-                header('Location: spielrunde.php?runde=' . $runde . '&sort=' . $sortParam . '&success=1');
+                $dirParam = isset($_POST['dir']) ? $_POST['dir'] : $sortDir;
+                header('Location: spielrunde.php?runde=' . $runde . '&sort=' . $sortParam . '&dir=' . $dirParam . '&success=1');
                 exit;
             } catch (Exception $e) {
                 error_log("Fehler beim Speichern: " . $e->getMessage());
@@ -83,7 +104,8 @@ if ($aktuellesTurnier) {
             'name' => $reg['name'],
             'name_auf_wertungsliste' => isset($reg['name_auf_wertungsliste']) ? intval($reg['name_auf_wertungsliste']) : 0,
             'punkte' => $ergebnis ? $ergebnis['punkte'] : null,
-            'eingetragen_am' => $ergebnis ? $ergebnis['geaendert_am'] : null
+            'eingetragen_am' => $ergebnis ? $ergebnis['geaendert_am'] : null,
+            'eingetragen_von' => $ergebnis && isset($ergebnis['geaendert_von']) ? $ergebnis['geaendert_von'] : null
         ];
     }
     
@@ -113,29 +135,47 @@ if ($aktuellesTurnier) {
         }
     }
     
-    // Nach gewählter Sortierung sortieren
+    // Nach gewählter Sortierung sortieren (sortDir: asc = A-Z/klein→groß, desc = Z-A/groß→klein)
     if ($sortierung === 'punktzahl') {
-        usort($alleErgebnisse, function($a, $b) {
+        usort($alleErgebnisse, function($a, $b) use ($sortDir) {
             $punkteA = $a['punkte'] !== null ? intval($a['punkte']) : -1;
             $punkteB = $b['punkte'] !== null ? intval($b['punkte']) : -1;
             if ($punkteA === $punkteB) {
                 return $a['startnummer'] - $b['startnummer'];
             }
-            return ($punkteB - $punkteA); // DESC
+            $r = $punkteB - $punkteA;
+            return $sortDir === 'desc' ? $r : -$r;
         });
     } elseif ($sortierung === 'eingabe') {
-        usort($alleErgebnisse, function($a, $b) {
+        usort($alleErgebnisse, function($a, $b) use ($sortDir) {
             $zeitA = $a['eingetragen_am'] ? strtotime($a['eingetragen_am']) : 0;
             $zeitB = $b['eingetragen_am'] ? strtotime($b['eingetragen_am']) : 0;
             if ($zeitA === $zeitB) {
                 return $a['startnummer'] - $b['startnummer'];
             }
-            return ($zeitB - $zeitA); // DESC (neueste zuerst)
+            $r = $zeitB - $zeitA;
+            return $sortDir === 'desc' ? $r : -$r;
+        });
+    } elseif ($sortierung === 'von') {
+        usort($alleErgebnisse, function($a, $b) use ($sortDir) {
+            $vonA = $a['eingetragen_von'] ?? '';
+            $vonB = $b['eingetragen_von'] ?? '';
+            $cmp = strcasecmp($vonA, $vonB);
+            $r = $cmp !== 0 ? $cmp : ($a['startnummer'] - $b['startnummer']);
+            return $sortDir === 'asc' ? $r : -$r;
+        });
+    } elseif ($sortierung === 'name') {
+        usort($alleErgebnisse, function($a, $b) use ($sortDir) {
+            $nameA = isset($a['name']) ? (string)$a['name'] : '';
+            $nameB = isset($b['name']) ? (string)$b['name'] : '';
+            $cmp = strcasecmp($nameA, $nameB);
+            $r = $cmp !== 0 ? $cmp : ($a['startnummer'] - $b['startnummer']);
+            return $sortDir === 'asc' ? $r : -$r;
         });
     } else {
-        // Nach Startnummer sortieren
-        usort($alleErgebnisse, function($a, $b) {
-            return $a['startnummer'] - $b['startnummer'];
+        usort($alleErgebnisse, function($a, $b) use ($sortDir) {
+            $r = $a['startnummer'] - $b['startnummer'];
+            return $sortDir === 'asc' ? $r : -$r;
         });
     }
     
@@ -336,6 +376,7 @@ if ($aktuellesTurnier) {
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
+            background: white;
         }
         th, td {
             padding: 12px;
@@ -346,6 +387,12 @@ if ($aktuellesTurnier) {
             background: #667eea;
             color: white;
             font-weight: bold;
+        }
+        th a {
+            cursor: pointer;
+        }
+        th a:hover {
+            text-decoration: underline !important;
         }
         tr:hover {
             background: #f9f9f9;
@@ -370,12 +417,6 @@ if ($aktuellesTurnier) {
         function rundeWechseln() {
             var runde = document.getElementById('runde-select').value;
             window.location.href = 'spielrunde.php?runde=' + runde;
-        }
-        
-        function sortierungRundeWechseln() {
-            var sort = document.getElementById('sort-runde-select').value;
-            var runde = document.getElementById('runde-select').value;
-            window.location.href = 'spielrunde.php?runde=' + runde + '&sort=' + sort;
         }
         
         function druckeTabelle(runde) {
@@ -511,6 +552,7 @@ if ($aktuellesTurnier) {
                         <input type="hidden" name="action" value="punkte_speichern">
                         <input type="hidden" name="runde" value="<?php echo $gewaehlteRunde; ?>">
                         <input type="hidden" name="sort" value="<?php echo htmlspecialchars($sortierung); ?>">
+                        <input type="hidden" name="dir" value="<?php echo htmlspecialchars($sortDir); ?>">
                         <div class="eingabe-form">
                             <div class="form-group">
                                 <label for="startnummer">Spielernummer:</label>
@@ -541,14 +583,6 @@ if ($aktuellesTurnier) {
                     <div style="margin-top: 30px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h3 style="margin: 0; color: #667eea;">Ergebnisse Runde <?php echo $gewaehlteRunde; ?></h3>
-                            <div class="sortierung">
-                                <label for="sort-runde-select">Sortierung:</label>
-                                <select id="sort-runde-select" onchange="sortierungRundeWechseln()">
-                                    <option value="punktzahl" <?php echo $sortierung === 'punktzahl' ? 'selected' : ''; ?>>Punktzahl</option>
-                                    <option value="startnummer" <?php echo $sortierung === 'startnummer' ? 'selected' : ''; ?>>Startnummer</option>
-                                    <option value="eingabe" <?php echo $sortierung === 'eingabe' ? 'selected' : ''; ?>>Reihenfolge der Eingabe</option>
-                                </select>
-                            </div>
                         </div>
                         <div class="tabelle-info">
                             <div>
@@ -556,19 +590,35 @@ if ($aktuellesTurnier) {
                             </div>
                             <button type="button" class="btn-print" onclick="druckeTabelle(<?php echo $gewaehlteRunde; ?>)">Drucken</button>
                         </div>
+                        <?php
+                        $sortBase = 'spielrunde.php?runde=' . (int)$gewaehlteRunde . '&sort=';
+                        $dirParam = '&dir=';
+                        $nextDir = function($col, $defaultAsc) use ($sortierung, $sortDir) {
+                            if ($sortierung === $col) {
+                                return $sortDir === 'asc' ? 'desc' : 'asc';
+                            }
+                            return $defaultAsc ? 'asc' : 'desc';
+                        };
+                        $sortIcon = function($col) use ($sortierung, $sortDir) {
+                            if ($sortierung !== $col) return '';
+                            return $sortDir === 'desc' ? ' ▾' : ' ▴';
+                        };
+                        ?>
                         <table id="tabelle-runde-<?php echo $gewaehlteRunde; ?>">
                             <thead>
                                 <tr>
-                                    <th>Startnummer</th>
-                                    <th>Name</th>
-                                    <th>Punktzahl</th>
+                                    <th><a href="<?php echo $sortBase; ?>startnummer<?php echo $dirParam . $nextDir('startnummer', true); ?>" style="color: inherit; text-decoration: none;">Startnummer<?php echo $sortIcon('startnummer'); ?></a></th>
+                                    <th><a href="<?php echo $sortBase; ?>name<?php echo $dirParam . $nextDir('name', true); ?>" style="color: inherit; text-decoration: none;">Name<?php echo $sortIcon('name'); ?></a></th>
+                                    <th><a href="<?php echo $sortBase; ?>punktzahl<?php echo $dirParam . $nextDir('punktzahl', false); ?>" style="color: inherit; text-decoration: none;">Punktzahl<?php echo $sortIcon('punktzahl'); ?></a></th>
                                     <th>Platzierung</th>
+                                    <th><a href="<?php echo $sortBase; ?>eingabe<?php echo $dirParam . $nextDir('eingabe', false); ?>" style="color: inherit; text-decoration: none;">Eingetragen am<?php echo $sortIcon('eingabe'); ?></a></th>
+                                    <th><a href="<?php echo $sortBase; ?>von<?php echo $dirParam . $nextDir('von', true); ?>" style="color: inherit; text-decoration: none;">Eingetragen von<?php echo $sortIcon('von'); ?></a></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($rundenErgebnisse)): ?>
                                     <tr>
-                                        <td colspan="4" style="text-align: center; color: #999;">Noch keine Ergebnisse für diese Runde</td>
+                                        <td colspan="6" style="text-align: center; color: #999;">Noch keine Ergebnisse für diese Runde</td>
                                     </tr>
                                 <?php else: ?>
                                     <?php foreach ($rundenErgebnisse as $ergebnis): ?>
@@ -577,6 +627,8 @@ if ($aktuellesTurnier) {
                                             <td><?php echo (isset($ergebnis['name_auf_wertungsliste']) && $ergebnis['name_auf_wertungsliste'] == 1) ? htmlspecialchars($ergebnis['name']) : '-'; ?></td>
                                             <td><?php echo $ergebnis['punkte'] !== null ? htmlspecialchars($ergebnis['punkte']) : '-'; ?></td>
                                             <td><?php echo $ergebnis['platzierung'] !== null ? htmlspecialchars($ergebnis['platzierung']) . '.' : '-'; ?></td>
+                                            <td><?php echo $ergebnis['eingetragen_am'] ? htmlspecialchars(date('d.m.Y H:i', strtotime($ergebnis['eingetragen_am']))) : '-'; ?></td>
+                                            <td><?php echo $ergebnis['eingetragen_von'] ? htmlspecialchars($ergebnis['eingetragen_von']) : '-'; ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>

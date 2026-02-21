@@ -40,6 +40,16 @@ if ($aktuellesTurnier) {
     }
 }
 
+// Prüfen ob bereits Zuordnungen existieren (vor POST-Auswertung, für Passwortschutz beim Neu-Berechnen)
+$hatZuordnungen = false;
+if ($aktuellesTurnier) {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT COUNT(*) as count FROM turnier_zuordnungen WHERE turnier_id = ?");
+    $stmt->execute([$aktuellesTurnier['id']]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $hatZuordnungen = ($result['count'] > 0);
+}
+
 // Prüfen ob Turnier gestartet werden soll
 if (isset($_POST['start_turnier'])) {
     if (!$aktuellesTurnier) {
@@ -73,21 +83,23 @@ if (isset($_POST['start_turnier'])) {
             if (!empty($validierungsFehler)) {
                 $error = implode(" ", $validierungsFehler);
             } else {
-                // Alle Parameter sind korrekt - Turnier starten
-                header('Location: turnier_berechnen.php');
-                exit;
+                // Wenn bereits Zuordnungen existieren: Passwort für Neu-Berechnen erforderlich
+                if ($hatZuordnungen) {
+                    $passwort = isset($_POST['neu_berechnen_passwort']) ? trim($_POST['neu_berechnen_passwort']) : '';
+                    if ($passwort !== 'neu.berechnen') {
+                        $error = $passwort === ''
+                            ? "Zum Neuberechnen der Turnierdaten ist das Passwort erforderlich."
+                            : "Das eingegebene Passwort ist nicht korrekt.";
+                    } else {
+                        header('Location: turnier_berechnen.php');
+                        exit;
+                    }
+                } else {
+                    header('Location: turnier_berechnen.php');
+                    exit;
+                }
             }
         }
-}
-
-// Prüfen ob bereits Zuordnungen existieren
-$hatZuordnungen = false;
-if ($aktuellesTurnier) {
-    $db = getDB();
-    $stmt = $db->prepare("SELECT COUNT(*) as count FROM turnier_zuordnungen WHERE turnier_id = ?");
-    $stmt->execute([$aktuellesTurnier['id']]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    $hatZuordnungen = ($result['count'] > 0);
 }
 ?>
 <!DOCTYPE html>
@@ -508,16 +520,6 @@ if ($aktuellesTurnier) {
                 Kein aktives Turnier gefunden. Bitte erst ein Turnier erfassen und aktivieren.
             </div>
         <?php else: ?>
-            <div class="info-box">
-                <p><strong>Aktuelles Turnier:</strong> <?php echo htmlspecialchars($aktuellesTurnier['titel']); ?></p>
-                <p><strong>Anzahl Teilnehmer:</strong> <?php echo htmlspecialchars($aktuellesTurnier['anzahl_spieler']); ?></p>
-                <p><strong>Anzahl Runden:</strong> <?php echo htmlspecialchars($aktuellesTurnier['anzahl_runden'] ?? '3'); ?></p>
-                <p><strong>Teilnehmer pro Runde (pro Tisch):</strong> <?php echo htmlspecialchars($aktuellesTurnier['spieler_pro_runde'] ?? '3'); ?></p>
-                <?php if ($hatZuordnungen): ?>
-                    <p><strong>Status:</strong> Turnier wurde bereits gestartet. Tischzuordnungen existieren.</p>
-                <?php endif; ?>
-            </div>
-            
             <?php if (!$parameterOk && !empty($parameterFehler)): ?>
                 <div class="message error">
                     <strong>Fehler in den Turnierparametern:</strong>
@@ -529,8 +531,6 @@ if ($aktuellesTurnier) {
                     <p style="margin-top: 10px;">Bitte korrigieren Sie die Parameter im Modul "Turnier erfassen".</p>
                 </div>
             <?php endif; ?>
-            
-            <h2>Turnier starten</h2>
             
             <?php if (!$hatZuordnungen): ?>
                 <?php if (!$parameterOk): ?>
@@ -557,12 +557,15 @@ if ($aktuellesTurnier) {
                 </div>
             <?php endif; ?>
             
+            <?php if ($hatZuordnungen): ?>
             <div style="margin-top: 20px;">
-                <form method="POST">
+                <form method="POST" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <input type="hidden" name="start_turnier" value="1">
                     <button type="submit" class="btn" <?php echo !$parameterOk ? 'disabled' : ''; ?>>Turnierdaten neu berechnen</button>
+                    <input type="password" id="neu_berechnen_passwort" name="neu_berechnen_passwort" value="" placeholder="Passwort" autocomplete="off" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 160px;">
                 </form>
             </div>
+            <?php endif; ?>
             
             <?php if ($hatZuordnungen): ?>
                 <div class="runde-container" style="margin-top: 30px;">

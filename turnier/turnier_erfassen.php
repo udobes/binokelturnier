@@ -155,6 +155,7 @@ $showForm = isset($_GET['new']) || $editMode;
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            background: white;
         }
         th, td {
             padding: 12px;
